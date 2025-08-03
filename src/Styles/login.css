@@ -1,7 +1,11 @@
-.loginbg{
-  background-image: url('/src/Images/staff/garagesoft.svg');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  animation: zoomBackground 20s ease-in-out infinite;
+/* src/index.css o donde esté definido */
+.loginbg {
+  /* Estas líneas ya no van más */
+  /* background-size: cover; */
+  /* background-position: center; */
+  /* background-repeat: no-repeat; */
+  /* animation: zoomBackground 20s ease-in-out infinite; */
+
+  position: relative; /* mantenemos esto para overlay */
+  z-index: 1;
 }

@@ -21,7 +21,7 @@ import '../../Styles/login.css';
 import { useAuth } from '../../AuthContext';
 import { motion } from 'framer-motion';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
-
+import VideoLogin from '../../Images/staff/videoBienvenida.mp4';
 Modal.setAppElement('#root');
 
 const LoginForm = () => {
@@ -102,16 +102,30 @@ const LoginForm = () => {
   };
 
   return (
-    <div className="h-screen w-full loginbg flex items-center justify-center bg-cover bg-center relative">
+    <div className="relative h-screen w-full overflow-hidden flex items-center justify-center bg-black loginbg">
+      {/* VIDEO DE FONDO */}
+      <video
+        className="absolute top-0 left-0 w-full h-full object-cover z-0"
+        src={VideoLogin}
+        autoPlay
+        muted
+        loop
+        playsInline
+      />
+
+      {/* CAPA OSCURA (opcional para contraste) */}
+      <div className="absolute top-0 left-0 w-full h-full bg-black/40 z-10" />
+
+      {/* FORMULARIO */}
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.6, ease: 'easeOut' }}
         whileHover={{
-          scale: 1.01,
-          boxShadow: '0 8px 30px rgba(59,130,246,0.3)'
+          scale: 1.02,
+          boxShadow: '0 10px 40px rgba(236, 72, 153, 0.5)' // más fuerte
         }}
-        className="bg-white shadow-2xl rounded-2xl p-8 w-[95%] max-w-md mx-auto"
+        className="relative z-20 bg-transparent  shadow-xl border border-white/30 hover:border-pink-400 rounded-2xl p-8 w-[95%] max-w-md mx-auto transition-all duration-300"
       >
         <h1 className="text-5xl titulo uppercase font-bold text-center text-pink-600 mb-2">
           Bienvenido
@@ -120,17 +134,17 @@ const LoginForm = () => {
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="text-center text-sm text-gray-500 mb-6"
+          className="text-center text-sm text-white mb-6"
         >
           Iniciá sesión para continuar
         </motion.p>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Correo Electrónico */}
+          {/* Correo */}
           <div>
             <label
               htmlFor="email"
-              className="block text-sm font-medium text-gray-700"
+              className="block text-sm font-medium text-white"
             >
               Correo Electrónico
             </label>
@@ -140,7 +154,7 @@ const LoginForm = () => {
               type="email"
               name="email"
               placeholder="ejemplo@correo.com"
-              className="w-full mt-1 p-3 bg-pink-50 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-pink-400 focus:border-pink-400 transition-all"
+              className="w-full mt-1 p-3 bg-pink-50 rounded-lg border border-white-300 focus:outline-none focus:ring-2 focus:ring-pink-400 focus:border-pink-400 transition-all"
               onChange={handleInput}
             />
             {errors.email && <Alerta>{errors.email}</Alerta>}
@@ -150,7 +164,7 @@ const LoginForm = () => {
           <div>
             <label
               htmlFor="password"
-              className="block text-sm font-medium text-gray-700"
+              className="block text-sm font-medium text-white"
             >
               Contraseña
             </label>
@@ -167,7 +181,7 @@ const LoginForm = () => {
               <button
                 type="button"
                 onClick={toggleShowPassword}
-                className="absolute top-1/2 right-3 transform -translate-y-1/2 text-gray-500 hover:text-pink-500"
+                className="absolute top-1/2 right-3 transform -translate-y-1/2 text-white-500 hover:text-pink-500"
               >
                 {showPassword ? <FaEyeSlash /> : <FaEye />}
               </button>
@@ -175,7 +189,7 @@ const LoginForm = () => {
             {errors.password && <Alerta>{errors.password}</Alerta>}
           </div>
 
-          {/* Botón de envío */}
+          {/* Botón */}
           <div className="text-center">
             <motion.button
               whileHover={{ scale: 1.05 }}
@@ -189,12 +203,12 @@ const LoginForm = () => {
           </div>
         </form>
 
-        <p className="mt-6 text-center text-xs text-gray-400 italic">
+        <p className="mt-6 text-center text-xs text-gray-200 italic">
           "El esfuerzo de hoy es el éxito de mañana"
         </p>
       </motion.div>
 
-      {/* Modal de error */}
+      {/* MODAL ERROR */}
       <Modal
         isOpen={isModalOpen}
         onRequestClose={() => setIsModalOpen(false)}
@@ -204,7 +218,6 @@ const LoginForm = () => {
       >
         <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl border-l-4 border-[#ff3b80] animate-fadeIn">
           <div className="flex items-center gap-4 mb-5">
-            {/* Ícono decorativo */}
             <div className="bg-[#ff3b80]/10 p-3 rounded-full">
               <svg
                 className="w-7 h-7 text-[#ff3b80]"
@@ -218,13 +231,11 @@ const LoginForm = () => {
                 />
               </svg>
             </div>
-
             <div>
               <h2 className="text-xl font-bold text-[#ff3b80]">¡Atención!</h2>
               <p className="text-gray-700 mt-1 leading-snug">{modalMessage}</p>
             </div>
           </div>
-
           <div className="text-end">
             <button
               onClick={() => setIsModalOpen(false)}

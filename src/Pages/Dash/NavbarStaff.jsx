@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import logoGarage from '../../Images/staff/imgLogo.png';
+import logoSueno from '../../Images/staff/imgLogoSueño.jpg';
 import menu from '../../Images/staff/menu.png';
 import close from '../../Images/staff/close.png';
 import { Link } from 'react-router-dom';
@@ -76,7 +76,7 @@ const NavbarStaff = () => {
         <div className="max-w-7xl mx-auto flex justify-between items-center py-2">
           {/* Logo */}
           <Link to="/">
-            <img src={logoGarage} alt="Logo" className="h-12 object-contain" />
+            <img src={logoSueno} alt="Logo" className="h-12 object-contain" />
           </Link>
 
           {/* Links para escritorio */}

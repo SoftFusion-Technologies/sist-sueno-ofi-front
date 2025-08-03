@@ -64,6 +64,7 @@ import VentasPorVendedor from './Pages/Vendedores/VentasPorVendedor';
 import DashboardEstadisticasVendedores from './Pages/Vendedores/DashboardEstadisticasVendedores';
 import CombosGet from './Pages/Stock/Combos/CombosGet';
 import ComboEditarPermitidos from './Pages/Stock/Combos/ComboEditarPermitidos';
+import Home from './Pages/Home';
 
 function AppContent() {
   const { hideLayoutFooter, hideLayoutNav } = useLayoutVisibility();
@@ -73,7 +74,7 @@ function AppContent() {
       <div className="w-full min-h-screen overflow-x-hidden bg-[#1f3636]">
         {/* {!hideLayoutNav && <NavBar />} */}
         <Rutas>
-          {/* <Ruta path="/" element={<Home />} /> */}
+          <Ruta path="/" element={<Home />} />
           {/* componentes del staff y login INICIO */}
           <Ruta path="/login" element={<LoginForm />} />
           <Ruta
@@ -389,8 +390,6 @@ function AppContent() {
           {/* MODULO DENTRO DE VENDEDORES FINAL BENJAMIN ORELLANA 01 08 25 */}
           {/* componentes del staff y login FINAL */}
           {/* <Ruta path="/*" element={<NotFound />} /> */}
-          {/* 🔁 Redirección automática al login si se accede a "/" */}
-          <Ruta path="/" element={<Navigate to="/login" replace />} />
           {/* 🔁 Ruta no encontrada */}
           <Ruta path="*" element={<Navigate to="/login" replace />} />
         </Rutas>
