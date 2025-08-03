@@ -20,7 +20,6 @@ import {
 const stockLinks = [
   { to: '/dashboard/stock/lugares', label: 'Lugares', icon: <FaWarehouse /> },
   { to: '/dashboard/stock/estados', label: 'Estados', icon: <FaTags /> },
-  { to: '/dashboard/stock/talles', label: 'Talles', icon: <FaRulerCombined /> },
   {
     to: '/dashboard/stock/categorias',
     label: 'Categoría',

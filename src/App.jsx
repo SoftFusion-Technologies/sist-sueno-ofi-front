@@ -31,7 +31,6 @@ import LoginForm from './Components/login/LoginForm';
 import AdminPage from './Pages/Dash/AdminPage';
 import AdminPageStock from './Pages/Stock/AdminPageStock';
 import LocalesGet from './Pages/MetodosGets/LocalesGet';
-import TallesGet from './Pages/Stock/TallesGet';
 import ProductosGet from './Pages/Stock/ProductosGet';
 import StockGet from './Pages/Stock/StockGet';
 
@@ -124,15 +123,6 @@ function AppContent() {
             }
           />
           {/* MODULO DENTRO DE STOCK INICIO BENJAMIN ORELLANA 22 06 25 */}
-          <Ruta
-            path="/dashboard/stock/talles"
-            element={
-              <ProtectedRoute>
-                {' '}
-                <TallesGet />{' '}
-              </ProtectedRoute>
-            }
-          />
           <Ruta
             path="/dashboard/stock/categorias"
             element={
