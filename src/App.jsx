@@ -65,6 +65,7 @@ import DashboardEstadisticasVendedores from './Pages/Vendedores/DashboardEstadis
 import CombosGet from './Pages/Stock/Combos/CombosGet';
 import ComboEditarPermitidos from './Pages/Stock/Combos/ComboEditarPermitidos';
 import Home from './Pages/Home';
+import LogsSistema from './Pages/MetodosGets/LogsSistema';
 
 function AppContent() {
   const { hideLayoutFooter, hideLayoutNav } = useLayoutVisibility();
@@ -110,6 +111,15 @@ function AppContent() {
               <ProtectedRoute>
                 {' '}
                 <LocalesGet />{' '}
+              </ProtectedRoute>
+            }
+          />
+          <Ruta
+            path="/dashboard/logs"
+            element={
+              <ProtectedRoute>
+                {' '}
+                <LogsSistema />{' '}
               </ProtectedRoute>
             }
           />

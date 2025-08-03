@@ -5,6 +5,7 @@ import { FaPlus, FaEdit, FaTrash, FaSearchLocation } from 'react-icons/fa';
 import Modal from 'react-modal';
 import ParticlesBackground from '../../Components/ParticlesBackground';
 import ButtonBack from '../../Components/ButtonBack';
+import { getUserId } from '../../utils/authUtils';
 
 Modal.setAppElement('#root');
 
@@ -30,6 +31,7 @@ const LocalesGet = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [formValues, setFormValues] = useState(defaultFormValues);
   const [editId, setEditId] = useState(null);
+  const usuarioId = getUserId();
 
   const fetchLocales = async () => {
     const res = await axios.get('http://localhost:8080/locales');
@@ -58,18 +60,29 @@ const LocalesGet = () => {
   };
 
   const handleDelete = async (id) => {
-    await axios.delete(`http://localhost:8080/locales/${id}`);
+    const usuarioId = getUserId();
+    await axios.delete(`http://localhost:8080/locales/${id}`, {
+      data: { usuario_log_id: usuarioId }
+    });
     fetchLocales();
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      const usuarioId = getUserId();
+
+      const payload = {
+        ...formValues,
+        usuario_log_id: usuarioId // 👈 clave para registrar el log
+      };
+
       if (editId) {
-        await axios.put(`http://localhost:8080/locales/${editId}`, formValues);
+        await axios.put(`http://localhost:8080/locales/${editId}`, payload);
       } else {
-        await axios.post('http://localhost:8080/locales', formValues);
+        await axios.post('http://localhost:8080/locales', payload);
       }
+
       fetchLocales();
       setModalOpen(false);
     } catch (error) {

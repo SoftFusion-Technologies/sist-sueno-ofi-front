@@ -5,6 +5,9 @@ import { FaUser, FaPlus, FaEdit, FaTrash } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 import ParticlesBackground from '../../Components/ParticlesBackground';
 import ButtonBack from '../../Components/ButtonBack';
+import { useAuth } from '../../AuthContext';
+import axiosWithAuth from '../../utils/axiosWithAuth';
+import { getUserId } from '../../utils/authUtils';
 
 Modal.setAppElement('#root');
 
@@ -21,7 +24,7 @@ export default function UsuariosGet() {
     rol: 'empleado',
     local_id: ''
   });
-
+  const usuarioId = getUserId();
   // RELACION AL FILTRADO BENJAMIN ORELLANA 24-04-25
   const [rolFiltro, setRolFiltro] = useState('todos');
   const [localFiltro, setLocalFiltro] = useState('todos');
@@ -29,10 +32,13 @@ export default function UsuariosGet() {
 
   const fetchUsuarios = async () => {
     try {
-      const res = await axios.get('http://localhost:8080/usuarios');
+      const res = await axiosWithAuth().get('/usuarios');
       setUsuarios(res.data);
     } catch (error) {
-      console.error('Error al obtener usuarios:', error);
+      console.error(
+        'Error al obtener usuarios:',
+        error.response?.data || error.message
+      );
     }
   };
 
@@ -76,10 +82,17 @@ export default function UsuariosGet() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      const client = axiosWithAuth();
       if (editId) {
-        await axios.put(`http://localhost:8080/usuarios/${editId}`, formData);
+        await client.put(`/usuarios/${editId}`, {
+          ...formData,
+          usuario_log_id: usuarioId
+        });
       } else {
-        await axios.post('http://localhost:8080/usuarios', formData);
+        await client.post('/usuarios', {
+          ...formData,
+          usuario_log_id: usuarioId
+        });
       }
       fetchUsuarios();
       setModalOpen(false);
@@ -90,7 +103,10 @@ export default function UsuariosGet() {
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`http://localhost:8080/usuarios/${id}`);
+      const client = axiosWithAuth();
+      await client.delete(`/usuarios/${id}`, {
+        data: { usuario_log_id: usuarioId }
+      });
       fetchUsuarios();
     } catch (err) {
       console.error('Error al eliminar usuario:', err);
@@ -152,9 +168,10 @@ export default function UsuariosGet() {
                 className="w-full px-4 py-2 rounded-lg bg-gray-800 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-600/80"
               >
                 <option value="todos">Todos</option>
-                <option value="admin">Admin</option>
-                <option value="empleado">Empleado</option>
+                <option value="socio">Socio</option>
+                <option value="administrativo">Administrativo</option>
                 <option value="vendedor">Vendedor</option>
+                <option value="contador">Contador</option>
               </select>
             </div>
 
@@ -274,9 +291,10 @@ export default function UsuariosGet() {
               className="w-full px-4 py-2 rounded-lg border border-gray-300"
               required
             >
-              <option value="admin">Admin</option>
-              <option value="empleado">Empleado</option>
+              <option value="socio">Socio</option>
+              <option value="administrativo">Administrativo</option>
               <option value="vendedor">Vendedor</option>
+              <option value="contador">Contador</option>
             </select>
             <select
               value={formData.local_id || ''}

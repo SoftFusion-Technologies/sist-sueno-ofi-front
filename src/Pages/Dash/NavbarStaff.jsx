@@ -64,6 +64,12 @@ const NavbarStaff = () => {
       href: 'dashboard/locales',
       title: 'Locales',
       roles: ['socio', 'administrador']
+    },
+    {
+      id: 4,
+      href: 'dashboard/logs',
+      title: 'Log de Detalle',
+      roles: ['socio', 'administrador']
     }
   ];
 
