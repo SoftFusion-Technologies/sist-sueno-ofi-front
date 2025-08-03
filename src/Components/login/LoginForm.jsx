@@ -22,6 +22,7 @@ import { useAuth } from '../../AuthContext';
 import { motion } from 'framer-motion';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import VideoLogin from '../../Images/staff/videoBienvenida.mp4';
+import ParticlesBackground from '../ParticlesBackground';
 Modal.setAppElement('#root');
 
 const LoginForm = () => {
@@ -115,6 +116,7 @@ const LoginForm = () => {
 
       {/* CAPA OSCURA (opcional para contraste) */}
       <div className="absolute top-0 left-0 w-full h-full bg-black/40 z-10" />
+      <ParticlesBackground></ParticlesBackground>
 
       {/* FORMULARIO */}
       <motion.div
