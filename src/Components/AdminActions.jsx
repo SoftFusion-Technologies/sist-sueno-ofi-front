@@ -6,7 +6,7 @@ import { FaEdit, FaTrash } from 'react-icons/fa';
 export default function AdminActions({ onEdit, onDelete }) {
   const { userLevel } = useAuth();
 
-  if (userLevel !== 'admin') return null;
+  if (userLevel !== 'socio') return null;
 
   return (
     <div className="mt-4 flex justify-end gap-4">
