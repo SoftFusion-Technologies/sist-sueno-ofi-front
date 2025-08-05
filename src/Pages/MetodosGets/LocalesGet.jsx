@@ -60,7 +60,6 @@ const LocalesGet = () => {
   };
 
   const handleDelete = async (id) => {
-    const usuarioId = getUserId();
     await axios.delete(`http://localhost:8080/locales/${id}`, {
       data: { usuario_log_id: usuarioId }
     });
@@ -70,7 +69,6 @@ const LocalesGet = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const usuarioId = getUserId();
 
       const payload = {
         ...formValues,

@@ -17,11 +17,12 @@ import * as XLSX from 'xlsx';
 import AdminActions from '../../Components/AdminActions';
 import AjustePreciosModal from './Components/AjustePreciosModal.jsx';
 import { useAuth } from '../../AuthContext.jsx';
+import { getUserId } from '../../utils/authUtils';
 
 Modal.setAppElement('#root');
 
 const ProductosGet = () => {
-    const { userLevel } = useAuth();
+  const { userLevel } = useAuth();
   const [productos, setProductos] = useState([]);
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
@@ -29,12 +30,17 @@ const ProductosGet = () => {
   const [formValues, setFormValues] = useState({
     nombre: '',
     descripcion: '',
+    marca: '',
+    modelo: '',
+    medida: '',
     categoria_id: '',
     precio: '',
-    descuento_porcentaje: '', // <-- AGREGADO
+    descuento_porcentaje: '',
+    codigo_sku: '',
     imagen_url: '',
     estado: 'activo'
   });
+
   const [confirmDelete, setConfirmDelete] = useState(null); // objeto con ID a eliminar
   const [warningMessage, setWarningMessage] = useState('');
 
@@ -110,9 +116,13 @@ const ProductosGet = () => {
       setFormValues({
         nombre: producto.nombre || '',
         descripcion: producto.descripcion || '',
+        marca: producto.marca || '',
+        modelo: producto.modelo || '',
+        medida: producto.medida || '',
         categoria_id: producto.categoria_id || producto.categoria?.id || '',
         precio: producto.precio?.toString() ?? '',
-        descuento_porcentaje: producto.descuento_porcentaje ?? '', // <-- AGREGADO
+        descuento_porcentaje: producto.descuento_porcentaje?.toString() ?? '',
+        codigo_sku: producto.codigo_sku || '',
         imagen_url: producto.imagen_url || '',
         estado: producto.estado || 'activo'
       });
@@ -121,8 +131,13 @@ const ProductosGet = () => {
       setFormValues({
         nombre: '',
         descripcion: '',
+        marca: '',
+        modelo: '',
+        medida: '',
         categoria_id: '',
         precio: '0',
+        descuento_porcentaje: '',
+        codigo_sku: '',
         imagen_url: '',
         estado: 'activo'
       });
@@ -142,10 +157,9 @@ const ProductosGet = () => {
     try {
       const dataToSend = {
         ...formValues,
-        precio: parsedPrecio.toFixed(2) // asegura formato DECIMAL(10,2)
+        precio: parsedPrecio.toFixed(2),
+        usuario_log_id: getUserId() // ⬅️ nombre correcto
       };
-
-      console.log(formValues);
 
       if (editId) {
         await axios.put(
@@ -165,7 +179,9 @@ const ProductosGet = () => {
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`http://localhost:8080/productos/${id}`);
+      await axios.delete(`http://localhost:8080/productos/${id}`, {
+        data: { usuario_log_id: getUserId() }
+      });
       fetchData();
     } catch (err) {
       if (err.response?.status === 409) {
@@ -224,7 +240,7 @@ const ProductosGet = () => {
 
             {/* Botones */}
             <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-              {userLevel === 'admin' && (
+              {userLevel === 'socio' && (
                 <button
                   onClick={() => setShowAjustePrecios(true)}
                   className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-xl font-semibold flex items-center gap-2 text-white"
@@ -312,6 +328,7 @@ const ProductosGet = () => {
             className="px-4 py-2 rounded-lg border bg-gray-800 border-gray-600 text-white"
           />
         </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {filtered.map((p) => (
             <motion.div
@@ -323,12 +340,35 @@ const ProductosGet = () => {
               <h2 className="text-xl font-bold text-rose-300 mb-1">
                 {p.nombre}
               </h2>
-              <p className="text-sm text-gray-200 mb-2">
-                Descripción: {p.descripcion || 'Sin Descripción'}
+
+              <p className="text-sm text-gray-200 mb-1">
+                <span className="font-semibold text-white">Descripción:</span>{' '}
+                {p.descripcion || 'Sin descripción'}
               </p>
 
-              <p className="text-sm text-gray-400">
-                Categoría: {p.categoria?.nombre || 'Sin categoría'}
+              <p className="text-sm text-gray-200 mb-1">
+                <span className="font-semibold text-white">Marca:</span>{' '}
+                {p.marca || 'Sin marca'}
+              </p>
+
+              <p className="text-sm text-gray-200 mb-1">
+                <span className="font-semibold text-white">Modelo:</span>{' '}
+                {p.modelo || 'Sin modelo'}
+              </p>
+
+              <p className="text-sm text-gray-200 mb-1">
+                <span className="font-semibold text-white">Medida:</span>{' '}
+                {p.medida || 'Sin medida'}
+              </p>
+
+              <p className="text-sm text-gray-200 mb-1">
+                <span className="font-semibold text-white">SKU:</span>{' '}
+                {p.codigo_sku || 'No asignado'}
+              </p>
+
+              <p className="text-sm text-gray-400 mb-1">
+                <span className="font-semibold text-white">Categoría:</span>{' '}
+                {p.categoria?.nombre || 'Sin categoría'}
               </p>
 
               <div className="flex items-center gap-3 mt-2">
@@ -346,33 +386,33 @@ const ProductosGet = () => {
                     minimumFractionDigits: 2
                   }).format(p.precio || 0)}
                 </span>
-                {/* Precio con descuento, si corresponde */}
+
+                {/* Precio con descuento */}
                 {p.descuento_porcentaje > 0 && (
-                  <span className="text-green-400 font-bold text-lg drop-shadow">
-                    {new Intl.NumberFormat('es-AR', {
-                      style: 'currency',
-                      currency: 'ARS',
-                      minimumFractionDigits: 2
-                    }).format(p.precio_con_descuento)}
-                  </span>
-                )}
-                {/* Etiqueta de descuento */}
-                {p.descuento_porcentaje > 0 && (
-                  <span className="bg-rose-100 text-rose-500 rounded px-2 py-1 text-xs font-bold ml-1">
-                    -{p.descuento_porcentaje}% OFF
-                  </span>
+                  <>
+                    <span className="text-green-400 font-bold text-lg drop-shadow">
+                      {new Intl.NumberFormat('es-AR', {
+                        style: 'currency',
+                        currency: 'ARS',
+                        minimumFractionDigits: 2
+                      }).format(p.precio_con_descuento)}
+                    </span>
+                    <span className="bg-rose-100 text-rose-500 rounded px-2 py-1 text-xs font-bold ml-1">
+                      -{p.descuento_porcentaje}% OFF
+                    </span>
+                  </>
                 )}
               </div>
 
               <p
-                className={`mt-2 uppercase text-sm font-semibold mb-1 ${
+                className={`mt-2 uppercase text-sm font-semibold ${
                   p.estado === 'activo' ? 'text-green-400' : 'text-red-400'
                 }`}
               >
                 {p.estado}
               </p>
 
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-gray-400 mt-1">
                 Creado el:{' '}
                 {new Date(p.created_at).toLocaleString('es-AR', {
                   day: '2-digit',
@@ -384,6 +424,7 @@ const ProductosGet = () => {
                   hour12: false
                 })}
               </p>
+
               <AdminActions
                 onEdit={() => openModal(p)}
                 onDelete={() => handleDelete(p.id)}
@@ -402,6 +443,7 @@ const ProductosGet = () => {
             {editId ? 'Editar Producto' : 'Nuevo Producto'}
           </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* NOMBRE */}
             <input
               type="text"
               placeholder="Nombre"
@@ -412,6 +454,8 @@ const ProductosGet = () => {
               className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-rose-400"
               required
             />
+
+            {/* DESCRIPCIÓN */}
             <textarea
               placeholder="Descripción"
               value={formValues.descripcion}
@@ -421,12 +465,48 @@ const ProductosGet = () => {
               className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-rose-400"
               rows="3"
             />
+
+            {/* MARCA */}
+            <input
+              type="text"
+              placeholder="Marca"
+              value={formValues.marca || ''}
+              onChange={(e) =>
+                setFormValues({ ...formValues, marca: e.target.value })
+              }
+              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-rose-400"
+            />
+
+            {/* MODELO */}
+            <input
+              type="text"
+              placeholder="Modelo"
+              value={formValues.modelo || ''}
+              onChange={(e) =>
+                setFormValues({ ...formValues, modelo: e.target.value })
+              }
+              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-rose-400"
+            />
+
+            {/* MEDIDA */}
+            <input
+              type="text"
+              placeholder="Medida (ej: 140x190)"
+              value={formValues.medida || ''}
+              onChange={(e) =>
+                setFormValues({ ...formValues, medida: e.target.value })
+              }
+              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-rose-400"
+            />
+
+            {/* CATEGORÍA */}
             <select
               value={formValues.categoria_id}
               onChange={(e) =>
                 setFormValues({ ...formValues, categoria_id: e.target.value })
               }
               className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-rose-400"
+              required
             >
               <option value="">Seleccionar categoría</option>
               {categorias.map((cat) => (
@@ -436,21 +516,20 @@ const ProductosGet = () => {
               ))}
             </select>
 
+            {/* PRECIO */}
             <input
               type="number"
               placeholder="Precio"
               value={formValues.precio}
               onChange={(e) =>
-                setFormValues({
-                  ...formValues,
-                  precio: e.target.value
-                })
+                setFormValues({ ...formValues, precio: e.target.value })
               }
               min="0"
               step="0.01"
               className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-rose-400"
             />
 
+            {/* DESCUENTO */}
             <input
               type="number"
               placeholder="Descuento (%)"
@@ -469,13 +548,26 @@ const ProductosGet = () => {
 
             {/* <input
               type="text"
+              placeholder="Código SKU"
+              value={formValues.codigo_sku || ''}
+              onChange={(e) =>
+                setFormValues({ ...formValues, codigo_sku: e.target.value })
+              }
+              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-rose-400"
+            /> */}
+
+            {/* IMAGEN */}
+            <input
+              type="text"
               placeholder="URL de Imagen"
-              value={formValues.imagen_url}
+              value={formValues.imagen_url || ''}
               onChange={(e) =>
                 setFormValues({ ...formValues, imagen_url: e.target.value })
               }
               className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-rose-400"
-            /> */}
+            />
+
+            {/* ESTADO */}
             <select
               value={formValues.estado}
               onChange={(e) =>
@@ -486,6 +578,7 @@ const ProductosGet = () => {
               <option value="activo">Activo</option>
               <option value="inactivo">Inactivo</option>
             </select>
+
             <div className="text-right">
               <button
                 type="submit"
@@ -496,6 +589,7 @@ const ProductosGet = () => {
             </div>
           </form>
         </Modal>
+
         <Modal
           isOpen={!!confirmDelete}
           onRequestClose={() => setConfirmDelete(null)}

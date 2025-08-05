@@ -8,6 +8,7 @@ import {
   FaSpinner,
   FaTag
 } from 'react-icons/fa';
+import { getUserId } from '../../../utils/authUtils';
 
 export default function AjustePreciosModal({ open, onClose, onSuccess }) {
   const [modoAjuste, setModoAjuste] = useState('ajuste'); // o 'descuento'
@@ -60,6 +61,7 @@ export default function AjustePreciosModal({ open, onClose, onSuccess }) {
 
   const handleSubmit = async () => {
     const valor = parseFloat(porcentaje);
+    const usuario_log_id = getUserId(); // 👈 Asegurate que existe esta función y devuelve el ID
 
     if (isNaN(valor)) {
       setError('Ingresá un porcentaje válido.');
@@ -90,11 +92,14 @@ export default function AjustePreciosModal({ open, onClose, onSuccess }) {
         modoAjuste === 'descuento'
           ? {
               descuento: valor,
-              categorias: seleccionadas.map((s) => s.value)
+              categorias: seleccionadas.map((s) => s.value),
+              usuario_log_id
             }
           : {
               porcentaje: valor,
-              categorias: seleccionadas.map((s) => s.value)
+              categorias: seleccionadas.map((s) => s.value),
+              usuario_log_id,
+              usarInflacion: modo === 'inflacion' 
             };
 
       const res = await axios.post(ruta, payload);
@@ -303,19 +308,45 @@ export default function AjustePreciosModal({ open, onClose, onSuccess }) {
             onChange={(selected) => setSeleccionadas(selected)}
             className="text-sm"
             styles={{
-              control: (base) => ({
+              control: (base, state) => ({
                 ...base,
-                backgroundColor: '#1f2937',
+                backgroundColor: '#1f2937', // gris oscuro
                 borderRadius: '0.75rem',
-                borderColor: '#4b5563',
+                borderColor: state.isFocused ? '#6366f1' : '#4b5563', // indigo al enfocar
+                boxShadow: state.isFocused ? '0 0 0 1px #6366f1' : 'none',
                 color: 'white',
-                padding: '4px'
+                padding: '4px',
+                '&:hover': {
+                  borderColor: '#6366f1'
+                }
+              }),
+              singleValue: (base) => ({
+                ...base,
+                color: 'white'
+              }),
+              input: (base) => ({
+                ...base,
+                color: 'white'
+              }),
+              placeholder: (base) => ({
+                ...base,
+                color: '#9ca3af' // gris claro
               }),
               menu: (base) => ({
                 ...base,
                 zIndex: 9999,
                 backgroundColor: '#111827',
                 color: 'white'
+              }),
+              option: (base, { isFocused, isSelected }) => ({
+                ...base,
+                backgroundColor: isSelected
+                  ? '#4f46e5'
+                  : isFocused
+                  ? '#374151'
+                  : 'transparent',
+                color: 'white',
+                cursor: 'pointer'
               }),
               multiValue: (styles) => ({
                 ...styles,
@@ -324,6 +355,14 @@ export default function AjustePreciosModal({ open, onClose, onSuccess }) {
               multiValueLabel: (styles) => ({
                 ...styles,
                 color: 'white'
+              }),
+              multiValueRemove: (styles) => ({
+                ...styles,
+                color: 'white',
+                ':hover': {
+                  backgroundColor: '#4338ca',
+                  color: 'white'
+                }
               })
             }}
           />

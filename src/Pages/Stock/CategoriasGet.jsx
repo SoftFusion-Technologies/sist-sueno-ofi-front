@@ -7,6 +7,7 @@ import ButtonBack from '../../Components/ButtonBack.jsx';
 import ParticlesBackground from '../../Components/ParticlesBackground.jsx';
 import BulkUploadButton from '../../Components/BulkUploadButton.jsx';
 import AdminActions from '../../Components/AdminActions';
+import { getUserId } from '../../utils/authUtils';
 
 Modal.setAppElement('#root');
 
@@ -23,7 +24,7 @@ const CategoriasGet = () => {
 
   const [confirmDelete, setConfirmDelete] = useState(null); // objeto con ID a eliminar
   const [warningMessage, setWarningMessage] = useState('');
-
+  const usuarioId = getUserId();
   const fetchCategorias = async () => {
     try {
       const res = await axios.get('http://localhost:8080/categorias');
@@ -58,24 +59,37 @@ const CategoriasGet = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      const payload = {
+        ...formValues,
+        usuario_log_id: usuarioId // 👈 clave para registrar el log
+      };
+
       if (editId) {
-        await axios.put(
-          `http://localhost:8080/categorias/${editId}`,
-          formValues
-        );
+        await axios.put(`http://localhost:8080/categorias/${editId}`, payload);
       } else {
-        await axios.post('http://localhost:8080/categorias', formValues);
+        await axios.post('http://localhost:8080/categorias', payload);
       }
+
       fetchCategorias();
       setModalOpen(false);
     } catch (error) {
-      console.error('Error al guardar categoría:', error);
+      console.error(
+        'Error al guardar local:',
+        error.response?.data || error.message
+      );
     }
   };
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`http://localhost:8080/categorias/${id}`);
+      console.log(usuarioId);
+
+      await axios.delete(`http://localhost:8080/categorias/${id}`, {
+        data: {
+          usuario_log_id: usuarioId,
+          forzar: true
+        }
+      });
       fetchCategorias();
     } catch (err) {
       if (err.response?.status === 409) {
@@ -86,7 +100,6 @@ const CategoriasGet = () => {
       }
     }
   };
-
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 py-10 px-6 text-white">
