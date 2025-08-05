@@ -27,12 +27,26 @@ const LogsSistema = () => {
   const [selectedLog, setSelectedLog] = useState(null);
   const [showModal, setShowModal] = useState(false);
 
-  const acciones = ['crear', 'editar', 'eliminar'];
+  const acciones = [
+    'crear',
+    'editar',
+    'eliminar',
+    'aplicar-descuento',
+    'ajuste de precios'
+  ];
   const modulos = ['usuarios', 'ventas', 'clientes', 'productos', 'locales'];
+
+  const [paginaActual, setPaginaActual] = useState(1);
+  const registrosPorPagina = 10;
+  const [totalRegistros, setTotalRegistros] = useState(0);
 
   const fetchLogs = async () => {
     try {
-      const params = {};
+      const params = {
+        limit: registrosPorPagina,
+        offset: (paginaActual - 1) * registrosPorPagina
+      };
+
       if (filtro.q) params.q = filtro.q;
       if (filtro.desde) params.fecha_inicio = filtro.desde;
       if (filtro.hasta) params.fecha_fin = filtro.hasta;
@@ -40,7 +54,9 @@ const LogsSistema = () => {
       if (filtro.modulo) params.modulo = filtro.modulo;
 
       const res = await axiosWithAuth().get('/logs', { params });
-      setLogs(res.data);
+
+      setLogs(res.data.logs); // ✅ los logs actuales de la página
+      setTotalRegistros(res.data.total); // ✅ el total de logs
     } catch (error) {
       console.error('Error al obtener logs:', error);
     }
@@ -48,21 +64,18 @@ const LogsSistema = () => {
 
   useEffect(() => {
     fetchLogs();
-  }, []);
-
-  useEffect(() => {
-    fetchLogs();
-  }, [filtro]);
+  }, [filtro, paginaActual]); // ✅ se vuelve a llamar cuando cambia el filtro o página
 
   const handleChange = (e) => {
     setFiltro({ ...filtro, [e.target.name]: e.target.value });
+    setPaginaActual(1); // ✅ resetear a página 1 si cambian los filtros
   };
 
   const resetFiltros = () => {
     setFiltro({ q: '', desde: '', hasta: '', accion: '', modulo: '' });
-    fetchLogs();
+    setPaginaActual(1); // ✅ resetear a página 1
   };
-
+  
   const handleRowClick = (log) => {
     setSelectedLog(log);
     setShowModal(true);
@@ -72,6 +85,9 @@ const LogsSistema = () => {
     setShowModal(false);
     setSelectedLog(null);
   };
+
+  const totalPaginas = Math.ceil(totalRegistros / registrosPorPagina);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#1f2937] via-[#111827] to-[#000000] py-12 px-6 text-white relative font-sans">
       <ParticlesBackground />
@@ -222,6 +238,76 @@ const LogsSistema = () => {
             </tbody>
           </table>
         </div>
+        {/* Paginación inteligente */}
+        {totalPaginas > 1 && (
+          <div className="mt-6 flex justify-center flex-wrap gap-1">
+            {/* Botón anterior */}
+            <button
+              disabled={paginaActual === 1}
+              onClick={() => setPaginaActual(paginaActual - 1)}
+              className="px-3 py-1 rounded-lg text-white bg-white/10 hover:bg-white/20 disabled:opacity-40"
+            >
+              «
+            </button>
+
+            {/* Primer página */}
+            {paginaActual > 3 && (
+              <>
+                <button
+                  onClick={() => setPaginaActual(1)}
+                  className="px-3 py-1 rounded-lg text-white bg-white/10 hover:bg-white/20"
+                >
+                  1
+                </button>
+                <span className="px-2 text-white/50">...</span>
+              </>
+            )}
+
+            {/* Páginas alrededor de la actual */}
+            {Array.from({ length: totalPaginas }, (_, i) => i + 1)
+              .filter(
+                (pagina) =>
+                  pagina === 1 ||
+                  pagina === totalPaginas ||
+                  Math.abs(pagina - paginaActual) <= 2
+              )
+              .map((pagina) => (
+                <button
+                  key={pagina}
+                  onClick={() => setPaginaActual(pagina)}
+                  className={`px-3 py-1 rounded-lg font-semibold transition-all ${
+                    pagina === paginaActual
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-white/10 text-white/60 hover:bg-white/20'
+                  }`}
+                >
+                  {pagina}
+                </button>
+              ))}
+
+            {/* Última página */}
+            {paginaActual < totalPaginas - 2 && (
+              <>
+                <span className="px-2 text-white/50">...</span>
+                <button
+                  onClick={() => setPaginaActual(totalPaginas)}
+                  className="px-3 py-1 rounded-lg text-white bg-white/10 hover:bg-white/20"
+                >
+                  {totalPaginas}
+                </button>
+              </>
+            )}
+
+            {/* Botón siguiente */}
+            <button
+              disabled={paginaActual === totalPaginas}
+              onClick={() => setPaginaActual(paginaActual + 1)}
+              className="px-3 py-1 rounded-lg text-white bg-white/10 hover:bg-white/20 disabled:opacity-40"
+            >
+              »
+            </button>
+          </div>
+        )}
       </div>
       {/* MODAL DETALLE */}
       <AnimatePresence>
