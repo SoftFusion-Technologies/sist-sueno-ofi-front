@@ -24,6 +24,8 @@ import { useAuth } from '../../AuthContext.jsx';
 import { toast, ToastContainer } from 'react-toastify';
 import { ModalFeedback } from '../Ventas/Config/ModalFeedback.jsx';
 import Barcode from 'react-barcode';
+import { getUserId } from '../../utils/authUtils';
+
 Modal.setAppElement('#root');
 
 const StockGet = () => {
@@ -178,9 +180,12 @@ const StockGet = () => {
       return;
     }
 
+    const usuario_log_id = getUserId();
+
     const payload = {
       ...formData,
-      cantidad: cantidadNumerica
+      cantidad: cantidadNumerica,
+      usuario_log_id
     };
 
     // 🔄 EDICIÓN
@@ -234,7 +239,12 @@ const StockGet = () => {
     if (!confirmado) return;
 
     try {
-      await axios.delete(`http://localhost:8080/stock/${id}`);
+      await axios.delete(`http://localhost:8080/stock/${id}`, {
+        data: {
+          usuario_log_id: getUserId()
+        }
+      });
+
       fetchAll();
 
       setModalFeedbackMsg('Stock eliminado correctamente.');
@@ -266,7 +276,8 @@ const StockGet = () => {
         producto_id: grupoAEliminar.producto_id,
         local_id: grupoAEliminar.local_id,
         lugar_id: grupoAEliminar.lugar_id,
-        estado_id: grupoAEliminar.estado_id
+        estado_id: grupoAEliminar.estado_id,
+        usuario_log_id: getUserId()
       });
 
       setModalFeedbackMsg(

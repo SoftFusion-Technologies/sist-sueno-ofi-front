@@ -34,7 +34,15 @@ const LogsSistema = () => {
     'aplicar-descuento',
     'ajuste de precios'
   ];
-  const modulos = ['usuarios', 'ventas', 'clientes', 'productos', 'locales'];
+
+  const modulos = [
+    'usuarios',
+    'ventas',
+    'clientes',
+    'productos',
+    'locales',
+    'stock'
+  ];
 
   const [paginaActual, setPaginaActual] = useState(1);
   const registrosPorPagina = 10;
@@ -75,7 +83,7 @@ const LogsSistema = () => {
     setFiltro({ q: '', desde: '', hasta: '', accion: '', modulo: '' });
     setPaginaActual(1); // ✅ resetear a página 1
   };
-  
+
   const handleRowClick = (log) => {
     setSelectedLog(log);
     setShowModal(true);
