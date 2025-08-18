@@ -14,7 +14,10 @@ import {
   FaBoxOpen,
   FaMapPin,
   FaCircle,
-  FaPrint
+  FaPrint,
+  FaCopy,
+  FaTicketAlt,
+  FaTimes
 } from 'react-icons/fa';
 import ButtonBack from '../../Components/ButtonBack.jsx';
 import ParticlesBackground from '../../Components/ParticlesBackground.jsx';
@@ -27,6 +30,32 @@ import Barcode from 'react-barcode';
 import { getUserId } from '../../utils/authUtils';
 
 Modal.setAppElement('#root');
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const MAX_NOMBRE = 100;
+// R1- que se puedan imprimir todas las etiquetas del mismo producto BENJAMIN ORELLANA 9/8/25 ✅
+const descargarPdf = async (pathWithQuery, filename, token) => {
+  const url = `${API_BASE}${
+    pathWithQuery.startsWith('/') ? '' : '/'
+  }${pathWithQuery}`;
+
+  console.log(url);
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: token ? { Authorization: `Bearer ${token}` } : {}
+  });
+  if (!res.ok) throw new Error('No se pudo generar/descargar el PDF');
+  const blob = await res.blob();
+  const link = document.createElement('a');
+  const objectUrl = URL.createObjectURL(blob);
+  link.href = objectUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(objectUrl);
+};
+// R1- que se puedan imprimir todas las etiquetas del mismo producto BENJAMIN ORELLANA 9/8/25 ✅
 
 const StockGet = () => {
   const { userLevel } = useAuth();
@@ -82,6 +111,20 @@ const StockGet = () => {
 
   const [skuParaImprimir, setSkuParaImprimir] = useState(null);
   const titleRef = useRef(document.title);
+
+  const [descargandoTicket, setDescargandoTicket] = useState(false);
+
+  // R2 - permitir duplicar productos, para poder cambiar nombres BENJAMIN ORELLANA 9/8/25 ✅
+  const [dupOpen, setDupOpen] = useState(false);
+  const [dupGroup, setDupGroup] = useState(null);
+  const [dupNombre, setDupNombre] = useState('');
+  const [dupCopiarCant, setDupCopiarCant] = useState(false); // por defecto NO copiar cantidades
+  const [dupLoading, setDupLoading] = useState(false);
+  // NUEVOS estados para el modal mejorado
+  const [dupShowPreview, setDupShowPreview] = useState(false);
+  const [dupLocalesSel, setDupLocalesSel] = useState([]); // ids de locales seleccionados
+  const [dupShowLocales, setDupShowLocales] = useState(false); // dropdown de locales
+  // R2 - permitir duplicar productos, para poder cambiar nombres BENJAMIN ORELLANA 9/8/25 ✅
 
   const fetchAll = async () => {
     try {
@@ -424,6 +467,153 @@ const StockGet = () => {
     };
   }, []);
 
+  // R1- que se puedan imprimir todas las etiquetas del mismo producto BENJAMIN ORELLANA 9/8/25 ✅
+  const hayImprimiblesEnGrupo = (group) =>
+    Array.isArray(group?.items) &&
+    group.items.some((i) => (i.cantidad ?? 0) > 0);
+  // R1- que se puedan imprimir todas las etiquetas del mismo producto BENJAMIN ORELLANA 9/8/25 ✅
+
+  const imprimirTicketGrupo = async (group, opts = {}) => {
+    if (!hayImprimiblesEnGrupo(group)) {
+      setModalFeedbackMsg(
+        'Este grupo no tiene stock disponible para imprimir.'
+      );
+      setModalFeedbackType('info');
+      setModalFeedbackOpen(true);
+      return;
+    }
+
+    try {
+      setDescargandoTicket(true);
+
+      const producto = productos.find((p) => p.id === group.producto_id);
+      const nombreProd = producto?.nombre || 'producto';
+
+      const safeNombre = nombreProd
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9_-]/g, '_');
+
+      // Fecha dd-mm-aaaa
+      const d = new Date();
+      const fecha = [
+        String(d.getDate()).padStart(2, '0'),
+        String(d.getMonth() + 1).padStart(2, '0'),
+        d.getFullYear()
+      ].join('-');
+
+      // Perfil robusto por defecto (Code128 1D con ALTURA FIJA + texto)
+      const defaults = {
+        mode: 'group',
+        producto_id: String(group.producto_id),
+        local_id: String(group.local_id),
+        lugar_id: String(group.lugar_id),
+        estado_id: String(group.estado_id),
+
+        copies: '1', // 'qty' si querés una por unidad en stock
+        minQty: '1',
+
+        // Impresora 30×15 mm a 203dpi
+        dpi: '203',
+        quiet_mm: '3',
+
+        // Valor del código: numérico por IDs (lo que el lector escanea)
+        barcode_src: 'numeric',
+
+        // ---- 1D robusto (Code128)
+        symb: 'code128', // 'code128' | 'qrcode'
+
+        // Mostrar número debajo (legible para humano)
+        showText: '1', // <— AHORA ON por defecto
+        text_value: 'numeric', // <— mostrar el numérico (no el slug)
+        text_mode: 'shrink', // ajusta fuente a 1 línea
+        text_gap_mm: '2', // separación barras–texto
+
+        // Altura de barras y quiet interna
+        min_barcode_mm: '12', // 12–14mm si el lector es exigente
+        pad_modules: '6', // quiet-zone interna aprox (subí a 8 si hace falta)
+
+        // Tipos de letra
+        font_pt: '6',
+        min_font_pt: '3.5'
+      };
+
+      // Permite overrides rápidos (p.ej. { text_mode: 'shrink' } )
+      const params = new URLSearchParams({ ...defaults, ...opts });
+
+      await descargarPdf(
+        `/stock/etiquetas/ticket?${params.toString()}`,
+        `${safeNombre}_${fecha}_ticket.pdf`
+      );
+    } catch (e) {
+      console.error(e);
+      setModalFeedbackMsg('No se pudo generar el PDF de ticket.');
+      setModalFeedbackType('error');
+      setModalFeedbackOpen(true);
+    } finally {
+      setDescargandoTicket(false);
+    }
+  };
+
+  // R2 - permitir duplicar productos, para poder cambiar nombres BENJAMIN ORELLANA 9/8/25 ✅
+  const abrirDuplicar = (group) => {
+    setDupGroup(group);
+    // buscar el nombre real del producto
+    const prod = productos.find((p) => p.id === group.producto_id);
+    const nombreBase = prod?.nombre || 'Producto';
+    setDupNombre(`${nombreBase} (copia)`);
+    setDupCopiarCant(false);
+    setDupOpen(true);
+  };
+
+  const duplicarProducto = async () => {
+    if (!dupGroup) return;
+
+    const prodId = dupGroup.producto_id;
+    if (!dupNombre?.trim()) {
+      setModalFeedbackMsg('Ingresá un nombre nuevo para el producto.');
+      setModalFeedbackType('info');
+      setModalFeedbackOpen(true);
+      return;
+    }
+
+    try {
+      setDupLoading(true);
+      const body = {
+        nuevoNombre: dupNombre.trim(),
+        duplicarStock: true, // Duplicar estructura de stock
+        copiarCantidad: dupCopiarCant // false por defecto (recomendado)
+        // locales: [1,2,3]              // Para Req 3 (opcional)
+      };
+
+      const { data } = await axios.post(
+        `http://localhost:8080/productos/${prodId}/duplicar`,
+        body
+      );
+
+      // feedback + refrescar listas
+      setModalFeedbackMsg(
+        `Producto duplicado. Nuevo ID: ${data.nuevo_producto_id}`
+      );
+      setModalFeedbackType('success');
+      setModalFeedbackOpen(true);
+
+      setDupOpen(false);
+      await fetchAll(); // ya lo tenés implementado
+    } catch (e) {
+      setModalFeedbackMsg(
+        `No se pudo duplicar el producto. ${
+          e?.response?.data?.mensajeError || e.message
+        }`
+      );
+      setModalFeedbackType('error');
+      setModalFeedbackOpen(true);
+    } finally {
+      setDupLoading(false);
+    }
+  };
+  // R2 - permitir duplicar productos, para poder cambiar nombres BENJAMIN ORELLANA 9/8/25 ✅
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 py-10 px-6 text-white">
       <ParticlesBackground />
@@ -624,13 +814,43 @@ const StockGet = () => {
                 <div className="flex gap-2">
                   {userLevel === 'socio' && (
                     <>
+                      {/* Botón Imprimir TICKET por grupo (30×15) */}
+                      <button
+                        type="button"
+                        onClick={() => imprimirTicketGrupo(group)}
+                        disabled={
+                          descargandoTicket || !hayImprimiblesEnGrupo(group)
+                        }
+                        className={`mt-2 mb-2 px-3 py-1 rounded-lg text-white text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60
+    ${
+      hayImprimiblesEnGrupo(group)
+        ? 'bg-orange-500 hover:bg-orange-400'
+        : 'bg-white/20 cursor-not-allowed'
+    }`}
+                        title={
+                          hayImprimiblesEnGrupo(group)
+                            ? 'Imprimir TICKET 30×15 del grupo'
+                            : 'Sin stock para imprimir'
+                        }
+                      >
+                        <FaTicketAlt className="text-orange-200" />
+                        {descargandoTicket ? '' : ''}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => abrirDuplicar(group)}
+                        className="mt-2 mb-2 px-3 py-1 bg-blue-600 hover:bg-blue-500 rounded-lg text-white text-sm font-semibold flex items-center justify-center gap-2"
+                        title="Duplicar producto"
+                      >
+                        <FaCopy className="text-blue-200" />
+                      </button>
                       <button
                         onClick={() => {
                           openModal(null, group); // null para item, group como segundo argumento
                         }}
                         className="mt-2 mb-2 px-3 py-1 bg-yellow-500 hover:bg-yellow-400 rounded-lg text-white text-sm font-semibold flex items-center justify-center gap-2"
                       >
-                        <FaEdit /> Editar
+                        <FaEdit />
                       </button>
                       <button
                         onClick={() => {
@@ -639,7 +859,7 @@ const StockGet = () => {
                         }}
                         className="mt-2 mb-2 px-3 py-1 bg-red-600 hover:bg-red-500 rounded-lg text-white text-sm font-semibold flex items-center justify-center gap-2"
                       >
-                        <FaTrash /> Eliminar
+                        <FaTrash />
                       </button>
                     </>
                   )}
@@ -789,78 +1009,374 @@ const StockGet = () => {
         </div>
       )}
 
-      <Modal
-        isOpen={!!skuParaImprimir}
-        onRequestClose={() => setSkuParaImprimir(null)}
-        overlayClassName="fixed inset-0 bg-black/50 flex justify-center items-center z-50"
-        className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full"
-      >
-        <h3 className="text-xl font-bold mb-4 text-green-700 flex items-center gap-2">
-          <FaPrint className="text-green-400" /> Imprimir código de barras
-        </h3>
-        {skuParaImprimir && (
-          <div className="flex flex-col items-center gap-4">
-            {/* Nombre y talle */}
-            <div className="font-semibold text-base text-black">
-              {skuParaImprimir.producto?.nombre}
-            </div>
-            {/* <div className="text-sm text-gray-600">
-              TALLE:{skuParaImprimir.talle?.nombre}
-            </div> */}
-
-            {/* Código de barras */}
-            <div
-              className="barcode-etiqueta"
-              style={{
-                width: '400px',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto'
-              }}
-            >
-              <Barcode
-                value={skuParaImprimir.codigo_sku}
-                format="CODE128"
-                width={2}
-                height={60}
-                displayValue={false} // <-- Oculta el texto cortado
-                margin={0}
-              />
-              {/* Texto SKU completo, centrado y sin cortes */}
-              <div
-                style={{
-                  fontSize: 13,
-                  marginTop: 4,
-                  fontWeight: 700,
-                  textAlign: 'center',
-                  wordBreak: 'break-all',
-                  maxWidth: '95%'
-                }}
-              >
-                {skuParaImprimir.codigo_sku}
+      {dupOpen && (
+        <div
+          className="fixed inset-0 z-[120] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setDupOpen(false);
+            if (
+              e.key === 'Enter' &&
+              dupNombre.trim() &&
+              dupNombre.trim().length <= MAX_NOMBRE &&
+              !dupLoading
+            )
+              duplicarProducto();
+          }}
+        >
+          <div className="w-full max-w-2xl bg-zinc-900/95 text-white rounded-2xl border border-white/10 shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="px-6 py-4 flex items-start justify-between border-b border-white/10">
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold flex items-center gap-2">
+                  <FaCopy className="text-blue-300" /> Duplicar producto
+                </h3>
+                <p className="text-xs text-white/70">
+                  Producto ID {dupGroup?.producto_id}
+                </p>
+                {!!productos?.length && (
+                  <p className="text-sm text-white/80">
+                    {productos.find((p) => p.id === dupGroup?.producto_id)
+                      ?.nombre ?? '—'}
+                  </p>
+                )}
               </div>
+              <button
+                type="button"
+                onClick={() => setDupOpen(false)}
+                className="p-2 rounded-xl hover:bg-white/10 text-white/80"
+                aria-label="Cerrar"
+              >
+                <FaTimes />
+              </button>
             </div>
 
-            {/* Botón imprimir */}
-            <button
-              onClick={handlePrint}
-              className="mt-2 px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold shadow"
-            >
-              Imprimir
-            </button>
+            {/* Body */}
+            <div className="px-6 py-5 space-y-5">
+              {/* Resumen pills (sin talles) */}
+              {(() => {
+                const items = dupGroup?.items || [];
+                const totalItems = items.length;
+                const totalQty = items.reduce(
+                  (a, i) => a + (i.cantidad ?? 0),
+                  0
+                );
 
-            <button
-              onClick={handleClose}
-              className="mt-2 px-5 py-1 rounded-full border border-green-300 text-green-700 font-semibold bg-white hover:bg-green-50 hover:border-green-400 transition-all text-sm shadow-sm"
-            >
-              Cerrar
-            </button>
+                const localName =
+                  locales.find((l) => l.id === dupGroup?.local_id)?.nombre ??
+                  `Local ${dupGroup?.local_id}`;
+                const lugarName =
+                  lugares.find((l) => l.id === dupGroup?.lugar_id)?.nombre ??
+                  `Lugar ${dupGroup?.lugar_id}`;
+                const estadoName =
+                  estados.find((e) => e.id === dupGroup?.estado_id)?.nombre ??
+                  `Estado ${dupGroup?.estado_id}`;
+
+                return (
+                  <div className="flex flex-wrap gap-2">
+                    <span className="text-xs px-2 py-1 rounded-full bg-white/10 border border-white/10">
+                      Ítems: <b>{totalItems}</b>
+                    </span>
+                    <span className="text-xs px-2 py-1 rounded-full bg-white/10 border border-white/10">
+                      Stock total: <b>{totalQty}</b>
+                    </span>
+                    <span className="text-xs px-2 py-1 rounded-full bg-white/10 border border-white/10">
+                      Local: <b>{localName}</b>
+                    </span>
+                    <span className="text-xs px-2 py-1 rounded-full bg-white/10 border border-white/10">
+                      Lugar: <b>{lugarName}</b>
+                    </span>
+                    <span className="text-xs px-2 py-1 rounded-full bg-white/10 border border-white/10">
+                      Estado: <b>{estadoName}</b>
+                    </span>
+                    <span className="text-xs px-2 py-1 rounded-full bg-white/10 border border-white/10">
+                      {dupCopiarCant ? 'Copiando stock' : 'Cantidades = 0'}
+                    </span>
+                  </div>
+                );
+              })()}
+
+              {/* Nombre + validación y contador */}
+              {(() => {
+                const nameExists = productos.some(
+                  (p) =>
+                    p.id !== dupGroup?.producto_id &&
+                    (p.nombre || '').trim().toLowerCase() ===
+                      dupNombre.trim().toLowerCase()
+                );
+                const tooLong = dupNombre.trim().length > MAX_NOMBRE;
+                const invalid = !dupNombre.trim() || tooLong;
+
+                // guardamos la condición para el botón
+                window.__dupInvalid = invalid;
+
+                return (
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-semibold">
+                        Nuevo nombre
+                      </label>
+                      <span
+                        className={`text-xs ${
+                          tooLong ? 'text-red-300' : 'text-white/50'
+                        }`}
+                      >
+                        {dupNombre.trim().length}/{MAX_NOMBRE}
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={dupNombre}
+                        onChange={(e) => setDupNombre(e.target.value)}
+                        autoFocus
+                        className={`mt-1 w-full rounded-xl bg-white/5 border px-3 py-2 text-white placeholder-white/50 focus:outline-none focus:ring-2
+                    ${
+                      invalid
+                        ? 'border-red-400 focus:ring-red-500'
+                        : 'border-white/10 focus:ring-purple-500'
+                    }`}
+                        placeholder="Ingresá el nuevo nombre…"
+                      />
+                      {!!dupNombre && (
+                        <button
+                          type="button"
+                          onClick={() => setDupNombre('')}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-white/60 hover:text-white"
+                          aria-label="Limpiar"
+                        >
+                          <FaTimes />
+                        </button>
+                      )}
+                    </div>
+                    <div className="mt-1 text-xs">
+                      <p className="text-white/60">
+                        Se copiará la <b>estructura de stock</b> del producto
+                        original.
+                      </p>
+                      {nameExists && (
+                        <p className="text-yellow-300 mt-1">
+                          Ya existe otro producto con este nombre. Podés
+                          continuar, pero conviene diferenciarlo.
+                        </p>
+                      )}
+                      {tooLong && (
+                        <p className="text-red-300 mt-1">
+                          Máximo {MAX_NOMBRE} caracteres.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Opciones */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label className="flex items-center gap-2">
+                  <input
+                    id="chk-copiar-cant"
+                    type="checkbox"
+                    checked={dupCopiarCant}
+                    onChange={(e) => setDupCopiarCant(e.target.checked)}
+                    className="h-4 w-4 accent-purple-600"
+                  />
+                  <span className="text-sm">Copiar stock</span>
+                </label>
+
+                {/* Dropdown de Locales (Req 3 listo) */}
+                {/* <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setDupShowLocales((v) => !v)}
+                    className="w-full text-left text-sm text-white/90 flex items-center justify-between bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl px-3 py-2"
+                  >
+                    <span>
+                      {dupLocalesSel.length === 0
+                        ? 'Todos los locales'
+                        : `Locales seleccionados: ${dupLocalesSel.length}`}
+                    </span>
+                    <span className="text-white/60">
+                      {dupShowLocales ? '▲' : '▼'}
+                    </span>
+                  </button>
+                  {dupShowLocales && (
+                    <div className="absolute mt-2 w-full bg-zinc-900/95 border border-white/10 rounded-xl shadow-xl z-[130] p-2 max-h-56 overflow-auto">
+                      <div className="flex items-center justify-between px-2 py-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setDupLocalesSel(locales.map((l) => l.id))
+                          }
+                          className="text-xs text-blue-300 hover:underline"
+                        >
+                          Seleccionar todos
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDupLocalesSel([])}
+                          className="text-xs text-blue-300 hover:underline"
+                        >
+                          Limpiar
+                        </button>
+                      </div>
+                      {locales.map((l) => {
+                        const checked = dupLocalesSel.includes(l.id);
+                        return (
+                          <label
+                            key={l.id}
+                            className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-white/5 cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 accent-purple-600"
+                              checked={checked}
+                              onChange={(e) => {
+                                const next = e.target.checked
+                                  ? [...dupLocalesSel, l.id]
+                                  : dupLocalesSel.filter((id) => id !== l.id);
+                                setDupLocalesSel(next);
+                              }}
+                            />
+                            <span className="text-sm">{l.nombre}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div> */}
+              </div>
+
+              {/* Preview SKU (sin talle) */}
+              {(() => {
+                const localName = locales.find(
+                  (l) => l.id === dupGroup?.local_id
+                )?.nombre;
+                const lugarName = lugares.find(
+                  (g) => g.id === dupGroup?.lugar_id
+                )?.nombre;
+                const estadoName = estados.find(
+                  (e) => e.id === dupGroup?.estado_id
+                )?.nombre;
+
+                // 🔧 Si tenías un helper buildSkuPreview que incluía talleNombre, ajustalo a esta firma.
+                const buildSkuPreview = ({
+                  productoNombre,
+                  localNombre,
+                  lugarNombre,
+                  estadoNombre
+                }) => {
+                  const parts = [
+                    (productoNombre || '').trim(),
+                    localNombre,
+                    lugarNombre,
+                    estadoNombre
+                  ].filter(Boolean);
+                  return parts.join(' · ');
+                };
+
+                const productoNombre =
+                  dupNombre ||
+                  productos.find((p) => p.id === dupGroup?.producto_id)
+                    ?.nombre ||
+                  '';
+
+                const exampleSku = buildSkuPreview({
+                  productoNombre,
+                  localNombre: localName,
+                  lugarNombre: lugarName,
+                  estadoNombre: estadoName
+                });
+
+                return (
+                  <div className="text-xs text-white/70 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
+                    <span className="text-white/90 font-semibold">
+                      Preview SKU:
+                    </span>{' '}
+                    {exampleSku}
+                  </div>
+                );
+              })()}
+
+              {/* Detalle de stock (sin talles) */}
+              <button
+                type="button"
+                onClick={() => setDupShowPreview((v) => !v)}
+                className="w-full text-left text-sm text-white/80 flex items-center justify-between bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl px-3 py-2"
+              >
+                <span>Ver detalle de stock</span>
+                <span className="text-white/60">
+                  {dupShowPreview ? '▲' : '▼'}
+                </span>
+              </button>
+
+              {dupShowPreview && (
+                <div className="max-h-56 overflow-auto rounded-xl border border-white/10">
+                  <table className="w-full text-sm">
+                    <thead className="bg-white/5 sticky top-0">
+                      <tr>
+                        <th className="text-left px-3 py-2">Ítem</th>
+                        <th className="text-right px-3 py-2">
+                          Cantidad origen
+                        </th>
+                        <th className="text-right px-3 py-2">
+                          Cantidad destino
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(dupGroup?.items || []).map((it) => (
+                        <tr key={it.id} className="border-t border-white/10">
+                          <td className="px-3 py-2">
+                            {/* Si querés más info, podés incluir: `ID ${it.id}` o nombre del producto */}
+                            ID {it.id}
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            {it.cantidad ?? 0}
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            {dupCopiarCant ? it.cantidad ?? 0 : 0}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-white/10 flex flex-col sm:flex-row sm:justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDupOpen(false)}
+                className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-semibold"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => duplicarProducto(dupLocalesSel)}
+                disabled={
+                  dupLoading ||
+                  !dupNombre.trim() ||
+                  dupNombre.trim().length > MAX_NOMBRE
+                }
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold disabled:opacity-50"
+                title={
+                  !dupNombre.trim()
+                    ? 'Ingresá un nombre'
+                    : dupNombre.trim().length > MAX_NOMBRE
+                    ? `Máximo ${MAX_NOMBRE} caracteres`
+                    : ''
+                }
+              >
+                {dupLoading ? 'Duplicando…' : 'Duplicar'}
+              </button>
+            </div>
           </div>
-        )}
-      </Modal>
-
+        </div>
+      )}
       <ModalFeedback
         open={modalFeedbackOpen}
         onClose={() => setModalFeedbackOpen(false)}
