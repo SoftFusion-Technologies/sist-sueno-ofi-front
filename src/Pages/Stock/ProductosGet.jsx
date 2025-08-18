@@ -610,14 +610,20 @@ const ProductosGet = () => {
             <button
               onClick={async () => {
                 try {
-                  // Eliminar stock primero
+                  const userId = getUserId();
+
+                  // 1) Eliminar stock (con log)
                   await axios.delete(
-                    `http://localhost:8080/stock/producto/${confirmDelete}`
+                    `http://localhost:8080/stock/producto/${confirmDelete}`,
+                    { data: { usuario_log_id: userId } }
                   );
-                  // Luego eliminar producto
+
+                  // 2) Eliminar producto (forzado=true para que el log diga “tenía stock”)
                   await axios.delete(
-                    `http://localhost:8080/productos/${confirmDelete}`
+                    `http://localhost:8080/productos/${confirmDelete}`,
+                    { data: { usuario_log_id: userId, forzado: true } }
                   );
+
                   setConfirmDelete(null);
                   fetchData();
                 } catch (error) {

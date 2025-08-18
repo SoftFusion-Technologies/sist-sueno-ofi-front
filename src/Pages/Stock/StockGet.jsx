@@ -28,6 +28,7 @@ import { toast, ToastContainer } from 'react-toastify';
 import { ModalFeedback } from '../Ventas/Config/ModalFeedback.jsx';
 import Barcode from 'react-barcode';
 import { getUserId } from '../../utils/authUtils';
+import SearchableSelect from './Components/SearchableSelect.jsx';
 
 Modal.setAppElement('#root');
 
@@ -64,6 +65,7 @@ const StockGet = () => {
   const [formData, setFormData] = useState({
     producto_id: '',
     local_id: '',
+    locales: [], // ← nuevo: varios locales
     lugar_id: '',
     estado_id: '',
     cantidad: 0,
@@ -88,6 +90,8 @@ const StockGet = () => {
   // RELACION AL FILTRADO BENJAMIN ORELLANA 23-04-25
   // const [talleFiltro, setTalleFiltro] = useState('todos');
   const [localFiltro, setLocalFiltro] = useState('todos');
+  const [localesFiltro, setLocalesFiltro] = useState([]); // [] = todos
+  const [showLocalesFiltro, setShowLocalesFiltro] = useState(false);
   const [lugarFiltro, setLugarFiltro] = useState('todos');
   const [estadoFiltro, setEstadoFiltro] = useState('todos');
   const [enPercheroFiltro, setEnPercheroFiltro] = useState('todos');
@@ -126,6 +130,10 @@ const StockGet = () => {
   const [dupShowLocales, setDupShowLocales] = useState(false); // dropdown de locales
   // R2 - permitir duplicar productos, para poder cambiar nombres BENJAMIN ORELLANA 9/8/25 ✅
 
+  // R3 - PERMITIR ASIGNAR STOCK A MAS DE UN LUGAR
+  const [showLocalesPicker, setShowLocalesPicker] = useState(false);
+  const [localesQuery, setLocalesQuery] = useState('');
+
   const fetchAll = async () => {
     try {
       const [resStock, resProd, resLocales, resLugares, resEstados] =
@@ -162,7 +170,7 @@ const StockGet = () => {
   const openModal = (item = null, group = null) => {
     if (item) {
       setEditId(item.id);
-      setFormData({ ...item });
+      setFormData({ ...item, locales: [] });
       setGrupoOriginal(null);
       setGrupoEditando(null);
     } else if (group) {
@@ -191,6 +199,7 @@ const StockGet = () => {
         estado_id: '',
         en_exhibicion: true,
         codigo_sku: '',
+        locales: [],
         observaciones: '',
         cantidad: ''
       });
@@ -206,17 +215,26 @@ const StockGet = () => {
 
     const cantidadNumerica = Number(formData.cantidad);
 
-    // Validaciones
+    // Unificar local_id (select simple) + locales[] (multiselect)
+    const localesUnicos = [
+      Number(formData.local_id) || null,
+      ...(Array.isArray(formData.locales) ? formData.locales.map(Number) : [])
+    ].filter(Boolean);
+    const localesDedupe = [...new Set(localesUnicos)];
+
+    // ✅ Validaciones (sin talles)
     if (
       !formData.producto_id ||
-      !formData.local_id ||
       !formData.lugar_id ||
       !formData.estado_id ||
       isNaN(cantidadNumerica) ||
-      cantidadNumerica <= 0
+      cantidadNumerica <= 0 ||
+      (editId ? !formData.local_id : localesDedupe.length === 0)
     ) {
       setModalFeedbackMsg(
-        'Completa todos los campos obligatorios con valores válidos.'
+        editId
+          ? 'Completa producto, local, lugar, estado y una cantidad válida.'
+          : 'Completa producto, lugar, estado, cantidad y seleccioná al menos un local.'
       );
       setModalFeedbackType('info');
       setModalFeedbackOpen(true);
@@ -225,15 +243,23 @@ const StockGet = () => {
 
     const usuario_log_id = getUserId();
 
-    const payload = {
-      ...formData,
+    // Base del payload (sin talle)
+    const basePayload = {
+      producto_id: Number(formData.producto_id),
+      lugar_id: Number(formData.lugar_id),
+      estado_id: Number(formData.estado_id),
+      en_exhibicion: !!formData.en_exhibicion, // si tu backend usa en_exhibicion, ajustalo aquí
       cantidad: cantidadNumerica,
       usuario_log_id
     };
 
-    // 🔄 EDICIÓN
+    // 🔄 EDICIÓN (una fila de stock)
     if (editId) {
       try {
+        const payload = {
+          ...basePayload,
+          local_id: Number(formData.local_id)
+        };
         await axios.put(`http://localhost:8080/stock/${editId}`, payload);
         fetchAll();
         setModalOpen(false);
@@ -254,12 +280,34 @@ const StockGet = () => {
       return;
     }
 
-    // ➕ NUEVO
+    // ➕ ALTA (una o varias filas según locales seleccionados)
     try {
-      await axios.post(`http://localhost:8080/stock`, payload);
+      if (localesDedupe.length === 1) {
+        // Un solo local → un POST
+        const payload = {
+          ...basePayload,
+          local_id: localesDedupe[0]
+        };
+        await axios.post(`http://localhost:8080/stock`, payload);
+      } else {
+        // Varios locales → un POST por local
+        await Promise.all(
+          localesDedupe.map((locId) =>
+            axios.post(`http://localhost:8080/stock`, {
+              ...basePayload,
+              local_id: locId
+            })
+          )
+        );
+      }
+
       fetchAll();
       setModalOpen(false);
-      setModalFeedbackMsg('Stock creado correctamente.');
+      setModalFeedbackMsg(
+        localesDedupe.length > 1
+          ? 'Stock creado en los locales seleccionados.'
+          : 'Stock creado correctamente.'
+      );
       setModalFeedbackType('success');
       setModalFeedbackOpen(true);
     } catch (err) {
@@ -558,18 +606,23 @@ const StockGet = () => {
   // R2 - permitir duplicar productos, para poder cambiar nombres BENJAMIN ORELLANA 9/8/25 ✅
   const abrirDuplicar = (group) => {
     setDupGroup(group);
-    // buscar el nombre real del producto
+
+    // nombre base
     const prod = productos.find((p) => p.id === group.producto_id);
     const nombreBase = prod?.nombre || 'Producto';
     setDupNombre(`${nombreBase} (copia)`);
+
     setDupCopiarCant(false);
+
+    // 👇 resetear selección de locales al abrir
+    setDupLocalesSel([]); // ← importante si en tu modal usás este estado
+
     setDupOpen(true);
   };
 
   const duplicarProducto = async () => {
     if (!dupGroup) return;
 
-    const prodId = dupGroup.producto_id;
     if (!dupNombre?.trim()) {
       setModalFeedbackMsg('Ingresá un nombre nuevo para el producto.');
       setModalFeedbackType('info');
@@ -579,11 +632,35 @@ const StockGet = () => {
 
     try {
       setDupLoading(true);
+
+      const prodId = dupGroup.producto_id;
+
+      // ¿hay locales seleccionados en el modal?
+      const hayLocales =
+        Array.isArray(dupLocalesSel) && dupLocalesSel.length > 0;
+
       const body = {
         nuevoNombre: dupNombre.trim(),
-        duplicarStock: true, // Duplicar estructura de stock
-        copiarCantidad: dupCopiarCant // false por defecto (recomendado)
-        // locales: [1,2,3]              // Para Req 3 (opcional)
+        duplicarStock: true,
+        copiarCantidad: dupCopiarCant,
+        generarSku: true,
+
+        // ✅ MODO A: duplicar SOLO este grupo (si no eligieron locales)
+        ...(!hayLocales
+          ? {
+              soloGrupo: true,
+              local_id: dupGroup.local_id,
+              lugar_id: dupGroup.lugar_id,
+              estado_id: dupGroup.estado_id
+            }
+          : {}),
+
+        // ✅ MODO B: duplicar por lista de locales (si eligieron en el modal)
+        ...(hayLocales
+          ? {
+              locales: dupLocalesSel
+            }
+          : {})
       };
 
       const { data } = await axios.post(
@@ -591,7 +668,6 @@ const StockGet = () => {
         body
       );
 
-      // feedback + refrescar listas
       setModalFeedbackMsg(
         `Producto duplicado. Nuevo ID: ${data.nuevo_producto_id}`
       );
@@ -599,7 +675,7 @@ const StockGet = () => {
       setModalFeedbackOpen(true);
 
       setDupOpen(false);
-      await fetchAll(); // ya lo tenés implementado
+      await fetchAll();
     } catch (e) {
       setModalFeedbackMsg(
         `No se pudo duplicar el producto. ${
@@ -612,6 +688,7 @@ const StockGet = () => {
       setDupLoading(false);
     }
   };
+
   // R2 - permitir duplicar productos, para poder cambiar nombres BENJAMIN ORELLANA 9/8/25 ✅
 
   return (
@@ -760,6 +837,27 @@ const StockGet = () => {
               0
             );
 
+            // locales (además del actual) donde este producto tiene stock > 0
+            const otrosLocalesConStock = (() => {
+              const tot = new Map(); // local_id -> total
+              for (const s of stock) {
+                if (s.producto_id === group.producto_id) {
+                  tot.set(
+                    s.local_id,
+                    (tot.get(s.local_id) || 0) + (Number(s.cantidad) || 0)
+                  );
+                }
+              }
+              const idsConStock = [...tot.entries()]
+                .filter(([, q]) => q > 0)
+                .map(([id]) => id);
+
+              // mapeamos a objetos de "locales", excluyendo el local actual del grupo
+              return locales.filter(
+                (l) => idsConStock.includes(l.id) && l.id !== group.local_id
+              );
+            })();
+
             return (
               <motion.div
                 key={group.key}
@@ -771,6 +869,19 @@ const StockGet = () => {
                 </h2>
                 <p className="text-sm">ID: {producto?.id}</p>
                 <p className="text-sm">Local: {local?.nombre}</p>
+                {otrosLocalesConStock.length > 0 && (
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                    <span className="text-white/70">También en:</span>
+                    {otrosLocalesConStock.map((l) => (
+                      <span
+                        key={l.id}
+                        className="px-2 py-1 rounded-full bg-white/10 border border-white/10"
+                      >
+                        {l.nombre}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <p className="text-sm">Lugar: {lugar?.nombre || 'Sin lugar'}</p>
                 <p className="text-sm">
                   Estado: {estado?.nombre || 'Sin Estado'}
@@ -880,38 +991,227 @@ const StockGet = () => {
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-4 text-gray-800">
-            {/* Campos comunes */}
-            {[
-              { label: 'Producto', name: 'producto_id', options: productos },
-              { label: 'Local', name: 'local_id', options: locales },
-              { label: 'Lugar', name: 'lugar_id', options: lugares },
-              { label: 'Estado', name: 'estado_id', options: estados }
-            ].map(({ label, name, options }) => (
-              <div key={name}>
-                <label className="block font-semibold mb-1">{label}</label>
-                <select
-                  value={formData[name]}
-                  onChange={(e) =>
-                    setFormData({ ...formData, [name]: Number(e.target.value) })
-                  }
-                  className="w-full px-4 py-2 rounded-lg border border-gray-300"
-                  required
-                >
-                  <option value="">Seleccione {label}</option>
-                  {options.map((opt) => (
-                    <option key={opt.id} value={opt.id}>
-                      {opt.nombre}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ))}
+            {/* Producto */}
+            <SearchableSelect
+              label="Producto"
+              items={productos}
+              value={formData.producto_id}
+              onChange={(id) =>
+                setFormData((fd) => ({ ...fd, producto_id: Number(id) || '' }))
+              }
+              required
+              placeholder="Buscar o seleccionar producto…"
+            />
 
-            {/* SKU solo en edición */}
+            {/* Local (single). Si eligen multi-locales más abajo, este deja de ser requerido */}
+            <SearchableSelect
+              label="Local"
+              items={locales}
+              value={formData.local_id}
+              onChange={(id) =>
+                setFormData((fd) => ({ ...fd, local_id: Number(id) || '' }))
+              }
+              required={!(formData.locales?.length > 0)}
+              placeholder="Buscar local…"
+            />
+
+            {/* Lugar */}
+            <SearchableSelect
+              label="Lugar"
+              items={lugares}
+              value={formData.lugar_id}
+              onChange={(id) =>
+                setFormData((fd) => ({ ...fd, lugar_id: Number(id) || '' }))
+              }
+              required
+              placeholder="Buscar lugar…"
+            />
+
+            {/* Estado */}
+            <SearchableSelect
+              label="Estado"
+              items={estados}
+              value={formData.estado_id}
+              onChange={(id) =>
+                setFormData((fd) => ({ ...fd, estado_id: Number(id) || '' }))
+              }
+              required
+              placeholder="Buscar estado…"
+            />
+
+            {/* 🔹 NUEVO: selección múltiple de locales (solo en alta/edición de grupo) */}
+            {!editId && (
+              <div className="relative">
+                <label className="block font-semibold mb-1">
+                  Locales (múltiple)
+                </label>
+
+                {/* Botón que abre el picker */}
+                <button
+                  type="button"
+                  onClick={() => setShowLocalesPicker((v) => !v)}
+                  className="w-full px-4 py-2 rounded-lg border border-gray-300 bg-white flex items-center justify-between"
+                >
+                  <span className="text-left truncate">
+                    {formData.locales?.length
+                      ? `Seleccionados: ${formData.locales.length}`
+                      : 'Seleccionar uno o más…'}
+                  </span>
+                  {/* <FaChevronDown className="opacity-60" /> */}
+                </button>
+
+                {/* Chips de selección actual */}
+                {formData.locales?.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {formData.locales
+                      .map((id) => locales.find((l) => l.id === id))
+                      .filter(Boolean)
+                      .map((l) => (
+                        <span
+                          key={l.id}
+                          className="inline-flex items-center gap-2 px-2 py-1 rounded-full bg-cyan-50 text-cyan-700 border border-cyan-200 text-xs"
+                        >
+                          {l.nombre}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setFormData((fd) => ({
+                                ...fd,
+                                locales: fd.locales.filter((x) => x !== l.id)
+                              }))
+                            }
+                            className="hover:text-cyan-900"
+                            title="Quitar"
+                          >
+                            {/* <FaTimes /> */}×
+                          </button>
+                        </span>
+                      ))}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormData((fd) => ({ ...fd, locales: [] }))
+                      }
+                      className="text-xs text-gray-600 underline"
+                    >
+                      Limpiar
+                    </button>
+                  </div>
+                )}
+
+                {/* Popover */}
+                {showLocalesPicker && (
+                  <div className="absolute z-50 mt-2 w-full max-h-72 overflow-auto bg-white border border-gray-200 rounded-xl shadow-xl p-2">
+                    {/* Buscador + acciones rápidas */}
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="flex-1 relative">
+                        {/* <FaSearch className="absolute left-2 top-2.5 text-gray-400" /> */}
+                        <input
+                          type="text"
+                          value={localesQuery}
+                          onChange={(e) => setLocalesQuery(e.target.value)}
+                          placeholder="Buscar local…"
+                          className="w-full pl-3 pr-3 py-2 rounded-lg border border-gray-300"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormData((fd) => ({
+                            ...fd,
+                            locales: locales
+                              .filter((l) =>
+                                l.nombre
+                                  .toLowerCase()
+                                  .includes(localesQuery.toLowerCase())
+                              )
+                              .map((l) => l.id)
+                          }))
+                        }
+                        className="text-xs px-2 py-1 rounded-md border border-gray-300 hover:bg-gray-50"
+                        title="Seleccionar todos (filtrados)"
+                      >
+                        Seleccionar todos
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormData((fd) => ({ ...fd, locales: [] }))
+                        }
+                        className="text-xs px-2 py-1 rounded-md border border-gray-300 hover:bg-gray-50"
+                      >
+                        Limpiar
+                      </button>
+                    </div>
+
+                    {/* Lista con checkboxes */}
+                    <div className="space-y-1">
+                      {locales
+                        .filter((l) =>
+                          l.nombre
+                            .toLowerCase()
+                            .includes(localesQuery.toLowerCase())
+                        )
+                        .map((l) => {
+                          const checked = formData.locales.includes(l.id);
+                          return (
+                            <label
+                              key={l.id}
+                              className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-50 cursor-pointer"
+                            >
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4"
+                                checked={checked}
+                                onChange={(e) => {
+                                  setFormData((fd) => ({
+                                    ...fd,
+                                    locales: e.target.checked
+                                      ? [...new Set([...fd.locales, l.id])]
+                                      : fd.locales.filter((id) => id !== l.id)
+                                  }));
+                                }}
+                              />
+                              <span className="text-sm">{l.nombre}</span>
+                              {checked && (
+                                <span className="ml-auto text-xs text-cyan-700">
+                                  ✓
+                                </span>
+                              )}
+                            </label>
+                          );
+                        })}
+                    </div>
+
+                    <div className="mt-2 flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowLocalesPicker(false)}
+                        className="px-3 py-1 text-sm rounded-md border border-gray-300 hover:bg-gray-50"
+                      >
+                        Cerrar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowLocalesPicker(false)}
+                        className="px-3 py-1 text-sm rounded-md bg-cyan-600 text-white hover:bg-cyan-500"
+                      >
+                        Aplicar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <p className="text-xs text-gray-500 mt-1">
+                  Si seleccionás al menos un local acá, ignoramos el campo
+                  “Local” de arriba.
+                </p>
+              </div>
+            )}
             {editId && (
               <div>
                 <label className="block text-sm font-semibold text-gray-600">
-                  Código SKU
+                  Código SKU (Generado automáticamente)
                 </label>
                 <input
                   type="text"
@@ -949,7 +1249,6 @@ const StockGet = () => {
               <label>En exhibición</label>
             </div>
 
-            {/* Botón */}
             <div className="text-right">
               <button
                 type="submit"
