@@ -50,7 +50,7 @@ function agruparProductosConTalles(stockItems) {
 
     producto.talles.push({
       id: item.talle_id,
-      nombre: item.talle_nombre || 'Sin talle',
+      nombre: item.talle_nombre || 'Sin Nombre',
       cantidad: item.cantidad_disponible,
       stock_id: item.stock_id,
       codigo_sku: item.codigo_sku
@@ -1338,8 +1338,8 @@ export default function PuntoVenta() {
                       <div className="flex flex-col text-left">
                         <span className="font-semibold text-gray-900">
                           {prod.nombre}
-                          {prod.talle_nombre
-                            ? ` - Talle ${prod.talle_nombre}`
+                          {prod.medida
+                            ? ` - Talle ${prod.medida}`
                             : ''}
                         </span>
                         <span className="text-sm text-gray-500 mt-0.5">

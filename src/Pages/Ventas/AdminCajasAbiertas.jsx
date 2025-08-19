@@ -16,7 +16,7 @@ export default function AdminCajasAbiertas() {
   const [cajasAbiertas, setCajasAbiertas] = useState([]);
 
   useEffect(() => {
-    if (userLevel !== 'admin') return; // ✅ Evitá hacer la request si no es admin
+    if (userLevel !== 'socio') return; // ✅ Evitá hacer la request si no es admin
 
     axios
       .get('http://localhost:8080/cajas-abiertas')
@@ -61,7 +61,7 @@ export default function AdminCajasAbiertas() {
     }
   };
 
-  if (userLevel !== 'admin') {
+  if (userLevel !== 'socio') {
     return (
       <div className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f3460] text-white px-4">
         <ParticlesBackground />
