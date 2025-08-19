@@ -389,7 +389,7 @@ export default function ModalMediosPago({
                 {m.ajuste_porcentual > 0 && '+'}
                 {m.ajuste_porcentual}%
               </span>
-              {userLevel === 'admin' && (
+              {userLevel === 'socio' && (
                 <>
                   <button
                     className="p-1 sm:p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-zinc-700 rounded-full transition"

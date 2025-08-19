@@ -160,7 +160,7 @@ export default function TicketConfigCard() {
             )}
 
             {/* Botones */}
-            {userLevel === 'admin' && (
+            {userLevel === 'socio' && (
               <div className="col-span-2 flex flex-wrap gap-3 mt-2">
                 {!edit && config && (
                   <button

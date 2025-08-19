@@ -228,7 +228,7 @@ const StockGet = () => {
       !formData.lugar_id ||
       !formData.estado_id ||
       isNaN(cantidadNumerica) ||
-      cantidadNumerica <= 0 ||
+      cantidadNumerica < 0 ||
       (editId ? !formData.local_id : localesDedupe.length === 0)
     ) {
       setModalFeedbackMsg(

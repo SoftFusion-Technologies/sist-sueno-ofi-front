@@ -104,7 +104,7 @@ const NavbarStaff = () => {
 
           {/* Usuario + Notificación + Logout */}
           <div className="hidden lg:flex items-center gap-4">
-            <NotificationBell />
+            {/* <NotificationBell /> */}
             <span className="text-sm text-gray-600">
               Bienvenido <strong>{displayUserName}</strong>
             </span>
@@ -118,7 +118,7 @@ const NavbarStaff = () => {
 
           {/* Mobile: campana + menú */}
           <div className="lg:hidden flex items-center gap-3">
-            <NotificationBell />
+            {/* <NotificationBell /> */}
             <img
               src={toggle ? close : menu}
               alt="hamburger"

@@ -86,7 +86,7 @@ export default function AjustePreciosModal({ open, onClose, onSuccess }) {
       const ruta =
         modoAjuste === 'descuento'
           ? 'http://localhost:8080/aplicar-descuento'
-          : 'http://localhost:8080/productos/aumentar-precio';
+          : 'http://localhost:8080/aumentar-precio';
 
       const payload =
         modoAjuste === 'descuento'
@@ -99,7 +99,7 @@ export default function AjustePreciosModal({ open, onClose, onSuccess }) {
               porcentaje: valor,
               categorias: seleccionadas.map((s) => s.value),
               usuario_log_id,
-              usarInflacion: modo === 'inflacion' 
+              usarInflacion: modo === 'inflacion'
             };
 
       const res = await axios.post(ruta, payload);

@@ -1,4 +1,5 @@
 // utils.js
+import api from '../utils/axiosClient';
 
 // --- Funciones para obtener datos desde endpoints ---
 export async function fetchLocales() {
@@ -8,11 +9,9 @@ export async function fetchLocales() {
 }
 
 export async function fetchUsuarios() {
-  const res = await fetch('http://localhost:8080/usuarios');
-  if (!res.ok) throw new Error('Error al obtener usuarios');
-  return await res.json();
+  const { data } = await api.get('/usuarios');
+  return data;
 }
-
 // --- Helpers para obtener nombres por id ---
 export function getNombreLocal(id, locales) {
   const local = locales.find((l) => String(l.id) === String(id));
