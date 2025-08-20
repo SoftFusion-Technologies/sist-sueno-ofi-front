@@ -41,7 +41,8 @@ const LogsSistema = () => {
     'clientes',
     'productos',
     'locales',
-    'stock'
+    'stock',
+    'combos'
   ];
 
   const [paginaActual, setPaginaActual] = useState(1);

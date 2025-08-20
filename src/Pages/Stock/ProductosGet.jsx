@@ -43,6 +43,7 @@ const ProductosGet = () => {
 
   const [confirmDelete, setConfirmDelete] = useState(null); // objeto con ID a eliminar
   const [warningMessage, setWarningMessage] = useState('');
+  const [deleteMeta, setDeleteMeta] = useState(null); // ← NUEVO
 
   // RELACION AL FILTRADO BENJAMIN ORELLANA 23-04-25
   const [estadoFiltro, setEstadoFiltro] = useState('todos');
@@ -187,6 +188,7 @@ const ProductosGet = () => {
       if (err.response?.status === 409) {
         setConfirmDelete(id);
         setWarningMessage(err.response.data.mensajeError);
+        setDeleteMeta(err.response.data || null); // ← guardamos reason
       } else {
         console.error('Error al eliminar producto:', err);
       }
@@ -589,10 +591,12 @@ const ProductosGet = () => {
             </div>
           </form>
         </Modal>
-
         <Modal
           isOpen={!!confirmDelete}
-          onRequestClose={() => setConfirmDelete(null)}
+          onRequestClose={() => {
+            setConfirmDelete(null);
+            setDeleteMeta(null);
+          }}
           overlayClassName="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50"
           className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl border-l-4 border-yellow-500"
         >
@@ -600,40 +604,58 @@ const ProductosGet = () => {
             Advertencia
           </h2>
           <p className="mb-6 text-gray-800">{warningMessage}</p>
+
           <div className="flex justify-end gap-4">
             <button
-              onClick={() => setConfirmDelete(null)}
+              onClick={() => {
+                setConfirmDelete(null);
+                setDeleteMeta(null);
+              }}
               className="px-4 py-2 rounded-lg bg-gray-300 hover:bg-gray-400"
             >
-              Cancelar
+              Cerrar
             </button>
-            <button
-              onClick={async () => {
-                try {
-                  const userId = getUserId();
 
-                  // 1) Eliminar stock (con log)
-                  await axios.delete(
-                    `http://localhost:8080/stock/producto/${confirmDelete}`,
-                    { data: { usuario_log_id: userId } }
-                  );
+            {deleteMeta?.reason === 'HAS_STOCK' && (
+              <button
+                onClick={async () => {
+                  try {
+                    const userId = getUserId();
+                    // 1) Eliminar stock
+                    await axios.delete(
+                      `http://localhost:8080/stock/producto/${confirmDelete}`,
+                      { data: { usuario_log_id: userId } }
+                    );
+                    // 2) Eliminar producto (forzado)
+                    await axios.delete(
+                      `http://localhost:8080/productos/${confirmDelete}`,
+                      { data: { usuario_log_id: userId, forzado: true } }
+                    );
+                    setConfirmDelete(null);
+                    setDeleteMeta(null);
+                    fetchData();
+                  } catch (error) {
+                    console.error('Error al eliminar con forzado:', error);
+                  }
+                }}
+                className="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white"
+              >
+                Eliminar stock y producto
+              </button>
+            )}
 
-                  // 2) Eliminar producto (forzado=true para que el log diga “tenía stock”)
-                  await axios.delete(
-                    `http://localhost:8080/productos/${confirmDelete}`,
-                    { data: { usuario_log_id: userId, forzado: true } }
-                  );
-
+            {/* Si es FK_COMBO, NO ofrecer acción destructiva */}
+            {deleteMeta?.reason === 'FK_COMBO' && (
+              <button
+                onClick={() => {
                   setConfirmDelete(null);
-                  fetchData();
-                } catch (error) {
-                  console.error('Error al eliminar con forzado:', error);
-                }
-              }}
-              className="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white"
-            >
-              Eliminar
-            </button>
+                  setDeleteMeta(null);
+                }}
+                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white"
+              >
+                Entendido
+              </button>
+            )}
           </div>
         </Modal>
       </div>

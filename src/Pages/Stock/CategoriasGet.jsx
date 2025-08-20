@@ -82,21 +82,17 @@ const CategoriasGet = () => {
 
   const handleDelete = async (id) => {
     try {
-      console.log(usuarioId);
-
       await axios.delete(`http://localhost:8080/categorias/${id}`, {
-        data: {
-          usuario_log_id: usuarioId,
-          forzar: true
-        }
+        data: { usuario_log_id: usuarioId } // 👈 sin forzar acá
       });
       fetchCategorias();
     } catch (err) {
       if (err.response?.status === 409) {
+        // El backend detectó dependencias (productos o combos)
         setConfirmDelete(id);
         setWarningMessage(err.response.data.mensajeError);
       } else {
-        console.error('Error al eliminar lugar:', err);
+        console.error('Error al eliminar categoría:', err);
       }
     }
   };
@@ -232,6 +228,7 @@ const CategoriasGet = () => {
             Advertencia
           </h2>
           <p className="mb-6 text-gray-800">{warningMessage}</p>
+
           <div className="flex justify-end gap-4">
             <button
               onClick={() => setConfirmDelete(null)}
@@ -239,11 +236,18 @@ const CategoriasGet = () => {
             >
               Cancelar
             </button>
+
             <button
               onClick={async () => {
                 try {
                   await axios.delete(
-                    `http://localhost:8080/categorias/${confirmDelete}?forzar=true`
+                    `http://localhost:8080/categorias/${confirmDelete}`,
+                    {
+                      data: {
+                        usuario_log_id: usuarioId,
+                        forzado: true // 👈 ahora sí
+                      }
+                    }
                   );
                   setConfirmDelete(null);
                   fetchCategorias();

@@ -128,6 +128,7 @@ export default function PuntoVenta() {
   const [carrito, setCarrito] = useState([]);
 
   const [modalProducto, setModalProducto] = useState(null);
+  
   const [talleSeleccionado, setTalleSeleccionado] = useState(null);
 
   const [modalVerProductosOpen, setModalVerProductosOpen] = useState(false);
@@ -171,12 +172,20 @@ export default function PuntoVenta() {
   }, [busqueda]);
 
   // Agregar producto al carrito
-  const agregarAlCarrito = (producto, talle, usarDesc) => {
-    const stockId = talle.stock_id;
+  // item esperado: {
+  //   stock_id, producto_id, nombre, precio, precio_con_descuento,
+  //   descuento_porcentaje, cantidad_disponible, codigo_sku, categoria_id
+  // }
+
+  const agregarAlCarrito = (item, usarDesc = true) => {
+    const stockId = item.stock_id;
+
     setCarrito((prev) => {
       const existe = prev.find((i) => i.stock_id === stockId);
+
       if (existe) {
-        if (existe.cantidad >= talle.cantidad) return prev;
+        // no superar el disponible
+        if (existe.cantidad >= item.cantidad_disponible) return prev;
         return prev.map((i) =>
           i.stock_id === stockId ? { ...i, cantidad: i.cantidad + 1 } : i
         );
@@ -186,26 +195,26 @@ export default function PuntoVenta() {
         ...prev,
         {
           stock_id: stockId,
-          producto_id: producto.producto_id,
-          nombre: `${producto.nombre} - ${talle.nombre}`,
-          precio_original: producto.precio,
-          precio_con_descuento:
-            producto.precio_con_descuento ?? producto.precio,
+          producto_id: item.producto_id,
+          nombre: item.nombre, // sin " - talle"
+          precio_original: item.precio,
+          precio_con_descuento: item.precio_con_descuento ?? item.precio,
           precio: usarDesc
-            ? producto.precio_con_descuento ?? producto.precio
-            : producto.precio,
-          descuentoPorcentaje: usarDesc
-            ? producto.descuento_porcentaje ?? 0
-            : 0, // 👈 esto es clave
-
-          talla_id: talle.id,
-          cantidad_disponible: talle.cantidad,
-          cantidad: 1
+            ? item.precio_con_descuento ?? item.precio
+            : item.precio,
+          descuentoPorcentaje: usarDesc ? item.descuento_porcentaje ?? 0 : 0,
+          // ❌ sin talla_id
+          cantidad_disponible: item.cantidad_disponible,
+          cantidad: 1,
+          codigo_sku: item.codigo_sku,
+          categoria_id: item.categoria_id
         }
       ];
     });
+
     setModalProducto(null);
-    setTalleSeleccionado(null);
+    // ❌ eliminar cualquier setTalleSeleccionado / estado de talle en tu UI
+    // setTalleSeleccionado?.(null);
   };
 
   // Manejo click para agregar producto (modal si tiene varios talles)
@@ -1164,9 +1173,9 @@ export default function PuntoVenta() {
             {/* Título */}
             <h3
               id="modal-title"
-              className="text-2xl font-bold mb-5 text-center text-gray-800"
+              className="uppercase text-2xl font-bold mb-5 text-center text-gray-800"
             >
-              Seleccioná talle para{' '}
+              Selección de{' '}
               <span className="text-emerald-600">{modalProducto.nombre}</span>
             </h3>
 
@@ -1187,7 +1196,7 @@ export default function PuntoVenta() {
                     type="button"
                   >
                     <span className="text-lg font-semibold">
-                      {talle.nombre || 'Sin talle'}
+                      {talle.nombre}
                     </span>
                     <span className="text-sm font-medium opacity-75">
                       {talle.cantidad} disponibles
@@ -1338,9 +1347,7 @@ export default function PuntoVenta() {
                       <div className="flex flex-col text-left">
                         <span className="font-semibold text-gray-900">
                           {prod.nombre}
-                          {prod.medida
-                            ? ` - Talle ${prod.medida}`
-                            : ''}
+                          {prod.medida ? ` - Talle ${prod.medida}` : ''}
                         </span>
                         <span className="text-sm text-gray-500 mt-0.5">
                           Stock: {prod.cantidad_disponible}

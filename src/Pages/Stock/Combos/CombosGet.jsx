@@ -15,6 +15,8 @@ import ParticlesBackground from '../../../Components/ParticlesBackground';
 import AdminActions from '../../../Components/AdminActions';
 import { formatearPeso } from '../../../utils/formatearPeso';
 import { Link } from 'react-router-dom';
+import { getUserId } from '../../../utils/authUtils';
+
 Modal.setAppElement('#root');
 
 const CombosGet = () => {
@@ -29,8 +31,10 @@ const CombosGet = () => {
   const [formCantidadItems, setFormCantidadItems] = useState('');
   const [formEstado, setFormEstado] = useState('activo');
 
-  const [confirmDelete, setConfirmDelete] = useState(null);
-  const [warningMessage, setWarningMessage] = useState('');
+  const [confirmDeleteCombo, setConfirmDeleteCombo] = useState(null);
+  const [warningMessageCombo, setWarningMessageCombo] = useState('');
+  const [deleteMetaCombo, setDeleteMetaCombo] = useState(null);
+  const [deletingCombo, setDeletingCombo] = useState(false);
 
   const fetchCombos = async () => {
     try {
@@ -61,12 +65,34 @@ const CombosGet = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Normalización
+    const precioFijoNum = Number(
+      String(formPrecioFijo ?? '').replace(',', '.')
+    );
+    const cantidadItemsNum = Number.parseInt(formCantidadItems, 10);
+
+    // Validaciones mínimas (podés ajustarlas a tu UX)
+    if (!formNombre?.trim()) {
+      console.error('Nombre requerido');
+      return;
+    }
+    if (!Number.isFinite(precioFijoNum)) {
+      console.error('Precio fijo inválido');
+      return;
+    }
+    if (!Number.isInteger(cantidadItemsNum) || cantidadItemsNum < 1) {
+      console.error('Cantidad de ítems inválida');
+      return;
+    }
+
     const payload = {
-      nombre: formNombre,
-      descripcion: formDescripcion,
-      precio_fijo: parseFloat(formPrecioFijo),
-      cantidad_items: parseInt(formCantidadItems),
-      estado: formEstado
+      nombre: formNombre.trim(),
+      descripcion: formDescripcion?.trim() || null,
+      precio_fijo: precioFijoNum,
+      cantidad_items: cantidadItemsNum,
+      estado: formEstado || 'activo',
+      usuario_log_id: getUserId() // 👈 para registrar en logs (crear/actualizar)
     };
 
     try {
@@ -78,18 +104,29 @@ const CombosGet = () => {
       fetchCombos();
       setModalOpen(false);
     } catch (error) {
-      console.error('Error al guardar combo:', error);
+      const msg =
+        error?.response?.data?.mensajeError ||
+        error?.message ||
+        'Error al guardar combo';
+      console.error(msg, error);
+      // si usás toasts/modales de feedback, podés mostrar `msg` al usuario aquí
     }
   };
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`http://localhost:8080/combos/${id}`);
+      await axios.delete(`http://localhost:8080/combos/${id}`, {
+        data: { usuario_log_id: getUserId() } // ← enviar quién elimina
+      });
       fetchCombos();
     } catch (err) {
       if (err.response?.status === 409) {
-        setConfirmDelete(id);
-        setWarningMessage(err.response.data.mensajeError);
+        // Mensaje y metadata para decidir UI
+        setConfirmDeleteCombo(id);
+        setWarningMessageCombo(
+          err.response.data?.mensajeError || 'No se pudo eliminar el combo.'
+        );
+        setDeleteMetaCombo(err.response.data || null); // e.g. { reason: 'HAS_ITEMS', items_count: N }
       } else {
         console.error('Error al eliminar combo:', err);
       }
@@ -232,38 +269,60 @@ const CombosGet = () => {
 
         {/* Modal de advertencia al eliminar */}
         <Modal
-          isOpen={!!confirmDelete}
-          onRequestClose={() => setConfirmDelete(null)}
+          isOpen={!!confirmDeleteCombo}
+          onRequestClose={() => {
+            setConfirmDeleteCombo(null);
+            setDeleteMetaCombo(null);
+          }}
           overlayClassName="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50"
           className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl border-l-4 border-yellow-500"
         >
           <h2 className="text-xl font-bold text-yellow-600 mb-4">
             Advertencia
           </h2>
-          <p className="mb-6 text-gray-800">{warningMessage}</p>
+          <p className="mb-6 text-gray-800">{warningMessageCombo}</p>
+
           <div className="flex justify-end gap-4">
             <button
-              onClick={() => setConfirmDelete(null)}
+              onClick={() => {
+                setConfirmDeleteCombo(null);
+                setDeleteMetaCombo(null);
+              }}
               className="px-4 py-2 rounded-lg bg-gray-300 hover:bg-gray-400"
             >
-              Cancelar
+              Cerrar
             </button>
-            <button
-              onClick={async () => {
-                try {
-                  await axios.delete(
-                    `http://localhost:8080/combos/${confirmDelete}?forzar=true`
-                  );
-                  setConfirmDelete(null);
-                  fetchCombos();
-                } catch (error) {
-                  console.error('Error al eliminar con forzado:', error);
-                }
-              }}
-              className="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white"
-            >
-              Eliminar
-            </button>
+
+            {/* Si el backend dijo que tiene ítems, ofrecemos borrado forzado */}
+            {deleteMetaCombo?.reason === 'HAS_ITEMS' && (
+              <button
+                disabled={deletingCombo}
+                onClick={async () => {
+                  try {
+                    setDeletingCombo(true);
+                    await axios.delete(
+                      `http://localhost:8080/combos/${confirmDeleteCombo}`,
+                      {
+                        data: { usuario_log_id: getUserId(), forzado: true } // ← forzado
+                      }
+                    );
+                    setConfirmDeleteCombo(null);
+                    setDeleteMetaCombo(null);
+                    fetchCombos();
+                  } catch (error) {
+                    console.error(
+                      'Error al eliminar combo con sus ítems:',
+                      error
+                    );
+                  } finally {
+                    setDeletingCombo(false);
+                  }
+                }}
+                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white disabled:opacity-60"
+              >
+                {deletingCombo ? 'Eliminando…' : 'Eliminar combo con sus ítems'}
+              </button>
+            )}
           </div>
         </Modal>
       </div>
