@@ -843,7 +843,8 @@ export default function CajaPOS() {
                   <div className="flex gap-2 items-center">
                     <FaStore className="text-emerald-400" />
                     <span>
-                      <b>Local:</b> {infoLocal.nombre}
+                      <b>Local: </b>
+                      <span className="text-gray-400">{infoLocal.nombre}</span>
                     </span>
                   </div>
                   <div className="flex gap-2 items-center text-gray-400 text-xs pl-6">
@@ -853,7 +854,9 @@ export default function CajaPOS() {
                     <FaUser className="text-emerald-400" />
                     <span>
                       <b>Usuario:</b>{' '}
-                      {getNombreUsuario(detalleCaja.usuario_id, usuarios)}
+                      <span className="text-gray-400">
+                        {getNombreUsuario(detalleCaja.usuario_id, usuarios)}
+                      </span>
                     </span>
                   </div>
                 </div>
