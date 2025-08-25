@@ -25,40 +25,13 @@ import axios from 'axios';
 import { useAuth } from '../../AuthContext'; // Ajustá el path si es necesario
 import TicketVentaModal from './Config/TicketVentaModal';
 import TotalConOpciones from './Components/TotalConOpciones';
+
+const toNum = (v, d = 0) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : d;
+};
+
 // Agrupa productos por producto_id y junta sus talles en un array
-function agruparProductosConTalles(stockItems) {
-  const map = new Map();
-
-  stockItems.forEach((item) => {
-    const productoNombre = item.nombre || 'Producto desconocido';
-    const productoPrecio = parseFloat(item.precio || 0);
-
-    if (!map.has(item.producto_id)) {
-      map.set(item.producto_id, {
-        id: item.producto_id,
-        producto_id: item.producto_id,
-        nombre: productoNombre,
-        precio: productoPrecio,
-        descuento_porcentaje: parseFloat(item.descuento_porcentaje) || 0,
-        precio_con_descuento:
-          parseFloat(item.precio_con_descuento) || productoPrecio,
-        talles: []
-      });
-    }
-
-    const producto = map.get(item.producto_id);
-
-    producto.talles.push({
-      id: item.talle_id,
-      nombre: item.talle_nombre || 'Sin Nombre',
-      cantidad: item.cantidad_disponible,
-      stock_id: item.stock_id,
-      codigo_sku: item.codigo_sku
-    });
-  });
-
-  return Array.from(map.values());
-}
 
 export default function PuntoVenta() {
   const navigate = useNavigate();
@@ -128,7 +101,7 @@ export default function PuntoVenta() {
   const [carrito, setCarrito] = useState([]);
 
   const [modalProducto, setModalProducto] = useState(null);
-  
+
   const [talleSeleccionado, setTalleSeleccionado] = useState(null);
 
   const [modalVerProductosOpen, setModalVerProductosOpen] = useState(false);
@@ -138,38 +111,48 @@ export default function PuntoVenta() {
 
   useEffect(() => {
     let ignore = false;
+
     const delay = setTimeout(() => {
-      if (busqueda.trim() !== '') {
-        setLoading(true); // Spinner pro
-        fetch(
-          `http://localhost:8080/buscar-productos-detallado?query=${encodeURIComponent(
-            busqueda
-          )}`
-        )
-          .then((res) => res.json())
-          .then((data) => {
-            if (!ignore) {
-              setProductos(
-                Array.isArray(data) ? agruparProductosConTalles(data) : []
-              );
-            }
-          })
-          .catch(() => {
-            if (!ignore) setProductos([]);
-          })
-          .finally(() => {
-            if (!ignore) setLoading(false);
-          });
-      } else {
+      const q = busqueda.trim();
+      if (!q) {
         setProductos([]);
+        return;
       }
-    }, 0); // o 350ms
+
+      setLoading(true);
+
+      // 🔹 Construimos la URL con query + local_id
+      const url = `http://localhost:8080/buscar-productos-detallado?query=${encodeURIComponent(
+        q
+      )}&local_id=${userLocalId}`;
+
+      fetch(url)
+        .then((res) => {
+          if (!res.ok) {
+            throw new Error(`Error ${res.status}`);
+          }
+          return res.json();
+        })
+        .then((data) => {
+          if (!ignore) {
+            // ✅ Guardar items tal cual vienen del back
+            setProductos(Array.isArray(data) ? data : []);
+          }
+        })
+        .catch((err) => {
+          console.error('Error al buscar productos:', err);
+          if (!ignore) setProductos([]);
+        })
+        .finally(() => {
+          if (!ignore) setLoading(false);
+        });
+    }, 0); // Si querés evitar spam de requests, podés poner 350ms
 
     return () => {
       clearTimeout(delay);
       ignore = true;
     };
-  }, [busqueda]);
+  }, [busqueda, userLocalId]);
 
   // Agregar producto al carrito
   // item esperado: {
@@ -177,57 +160,75 @@ export default function PuntoVenta() {
   //   descuento_porcentaje, cantidad_disponible, codigo_sku, categoria_id
   // }
 
-  const agregarAlCarrito = (item, usarDesc = true) => {
-    const stockId = item.stock_id;
+  // agregarAlCarrito(item, usarDesc = true, cantidad = 1)
+  const agregarAlCarrito = (item, usarDesc = true, cantidad = 1) => {
+    const stockId = item?.stock_id;
+    if (!stockId) return; // sin stock_id no podemos identificar la línea
+
+    const disponible = Math.max(0, toNum(item?.cantidad_disponible, 0));
+    if (disponible <= 0) return; // no agregues si no hay stock
+
+    // Coerción y fallbacks de precios
+    const precioBase = toNum(item?.precio, 0);
+    const precioDesc = toNum(item?.precio_con_descuento, precioBase);
+    const descPct = usarDesc ? toNum(item?.descuento_porcentaje, 0) : 0;
+
+    // Precio unitario efectivo según usarDesc
+    const precioUnit = usarDesc ? precioDesc : precioBase;
 
     setCarrito((prev) => {
-      const existe = prev.find((i) => i.stock_id === stockId);
+      const idx = prev.findIndex((i) => i.stock_id === stockId);
 
-      if (existe) {
-        // no superar el disponible
-        if (existe.cantidad >= item.cantidad_disponible) return prev;
-        return prev.map((i) =>
-          i.stock_id === stockId ? { ...i, cantidad: i.cantidad + 1 } : i
+      // Clamp de cantidad solicitada al disponible
+      const delta = Math.max(1, toNum(cantidad, 1));
+
+      if (idx !== -1) {
+        const linea = prev[idx];
+        const nuevaCant = Math.min(
+          disponible,
+          toNum(linea.cantidad, 0) + delta
         );
+        if (nuevaCant === linea.cantidad) return prev; // ya está al tope
+
+        const nuevaLinea = { ...linea, cantidad: nuevaCant };
+        const copia = prev.slice();
+        copia[idx] = nuevaLinea;
+        return copia;
       }
 
-      return [
-        ...prev,
-        {
-          stock_id: stockId,
-          producto_id: item.producto_id,
-          nombre: item.nombre, // sin " - talle"
-          precio_original: item.precio,
-          precio_con_descuento: item.precio_con_descuento ?? item.precio,
-          precio: usarDesc
-            ? item.precio_con_descuento ?? item.precio
-            : item.precio,
-          descuentoPorcentaje: usarDesc ? item.descuento_porcentaje ?? 0 : 0,
-          // ❌ sin talla_id
-          cantidad_disponible: item.cantidad_disponible,
-          cantidad: 1,
-          codigo_sku: item.codigo_sku,
-          categoria_id: item.categoria_id
-        }
-      ];
+      // Si es nuevo, respetá el stock
+      const cantInicial = Math.min(disponible, delta);
+
+      const nuevaLinea = {
+        stock_id: stockId,
+        producto_id: item.producto_id,
+        nombre: item.nombre,
+        // guardo snapshot de precios en el momento de agregar
+        precio_original: precioBase,
+        precio_con_descuento: precioDesc,
+        precio: precioUnit,
+        descuentoPorcentaje: descPct,
+        cantidad_disponible: disponible,
+        cantidad: cantInicial,
+        codigo_sku: item.codigo_sku,
+        categoria_id: item.categoria_id,
+        // opcionalmente, si lo tenés:
+        local_id: item.local_id ?? undefined
+      };
+
+      return [...prev, nuevaLinea];
     });
 
-    setModalProducto(null);
-    // ❌ eliminar cualquier setTalleSeleccionado / estado de talle en tu UI
-    // setTalleSeleccionado?.(null);
+    // Si ya no usás modal de talles, esto es inofensivo pero lo podés quitar:
+    setModalProducto?.(null);
   };
 
   // Manejo click para agregar producto (modal si tiene varios talles)
-  const manejarAgregarProducto = (producto, usarDesc) => {
-    if (!producto.talles || producto.talles.length === 0) return;
-
-    if (producto.talles.length === 1) {
-      agregarAlCarrito(producto, producto.talles[0], usarDesc);
-    } else {
-      setModalProducto(producto);
-      setTalleSeleccionado(null);
-      setModalUsarDescuento(usarDesc); // inicializar modal con ese valor si usas modal
-    }
+  // handler sin talles
+  const manejarAgregarProducto = (itemStock, usarDesc = true, cantidad = 1) => {
+    if (!itemStock?.stock_id) return; // requiere stock_id
+    if (!itemStock?.cantidad_disponible) return; // sin stock, no agregues
+    agregarAlCarrito(itemStock, usarDesc, cantidad);
   };
 
   useEffect(() => {
@@ -291,14 +292,31 @@ export default function PuntoVenta() {
 
   const abrirModalVerProductos = async () => {
     setModalVerProductosOpen(true);
+
+    // si no hay local, mejor no pedir nada
+    if (!userLocalId) {
+      console.warn('Sin userLocalId: no se puede filtrar por sucursal');
+      setProductosModal([]);
+      return;
+    }
+
     try {
+      // query vacío para listar los primeros 50 del local
+      const params = new URLSearchParams({
+        query: '',
+        local_id: String(userLocalId)
+      });
+
       const res = await fetch(
-        'http://localhost:8080/buscar-productos-detallado?query='
+        `http://localhost:8080/buscar-productos-detallado?${params}`
       );
+      if (!res.ok) throw new Error(`Error ${res.status}`);
+
       const data = await res.json();
-      setProductosModal(data);
+      setProductosModal(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error al cargar productos para el modal:', error);
+      setProductosModal([]);
     }
   };
 
@@ -317,86 +335,106 @@ export default function PuntoVenta() {
     combo.nombre.toLowerCase().includes(modalComboSearch.toLowerCase())
   );
 
-  const seleccionarProductoModal = (productoConTalle) => {
-    // productoConTalle tiene todas las propiedades de producto + talle
-    // Construimos un "producto" y "talle" para pasar a agregarAlCarrito
-
-    const producto = {
-      producto_id: productoConTalle.producto_id,
-      nombre: productoConTalle.nombre,
-      precio: productoConTalle.precio
-    };
-
-    const talle = {
-      id: productoConTalle.talle_id,
-      nombre: productoConTalle.talle_nombre,
-      cantidad: productoConTalle.cantidad_disponible,
-      stock_id: productoConTalle.stock_id
-    };
-
-    agregarAlCarrito(producto, talle);
+  const seleccionarProductoModal = (item, usarDesc = true) => {
+    if (!item?.stock_id || !item?.cantidad_disponible) return;
+    agregarAlCarrito(item, usarDesc);
     setModalVerProductosOpen(false);
   };
+
   const seleccionarCombo = async (combo) => {
     try {
+      // 1) Traer productos permitidos del combo
       const res = await fetch(
         `http://localhost:8080/combo-productos-permitidos/${combo.id}`
       );
+      if (!res.ok) throw new Error(`Error ${res.status} al cargar combo`);
       const permitidos = await res.json();
 
+      // Solo los que tienen producto asociado
       const productosDirectos = permitidos.filter((p) => p.producto);
 
-      const productosSeleccionados = [];
+      if (!productosDirectos.length) {
+        alert('Este combo no tiene productos configurados.');
+        return;
+      }
 
-      for (const item of productosDirectos) {
-        const producto = item.producto;
+      // 2) Precio unitario proporcional del combo (reparto simple)
+      const cantItems = Number(
+        combo.cantidad_items || productosDirectos.length
+      );
+      const precioUnitProporcional = Number(combo.precio_fijo) / cantItems;
 
-        const resStock = await fetch(
-          `http://localhost:8080/buscar-productos-detallado?query=${producto.id}`
+      // 3) Buscar stock por producto en el local del usuario (en paralelo)
+      const consultas = productosDirectos.map(async ({ producto }) => {
+        const params = new URLSearchParams({
+          query: String(producto.id),
+          local_id: String(userLocalId || '')
+        });
+        const r = await fetch(
+          `http://localhost:8080/buscar-productos-detallado?${params}`
         );
-        const stockData = await resStock.json();
+        if (!r.ok) return null;
+        const stockData = await r.json().catch(() => []);
+        if (!Array.isArray(stockData) || stockData.length === 0) return null;
 
-        if (stockData.length > 0) {
-          const talleDisponible = stockData[0];
+        // Elegí la primera fila de stock; si querés, ordená por cantidad
+        // stockData.sort((a,b)=> b.cantidad_disponible - a.cantidad_disponible);
+        const s = stockData[0];
 
-          const productoData = {
-            producto_id: producto.id,
-            nombre: producto.nombre,
-            precio: parseFloat(combo.precio_fijo) / combo.cantidad_items // Reparto proporcional
-          };
+        // 4) Armar item de stock para el carrito (sin talles)
+        const item = {
+          stock_id: s.stock_id,
+          producto_id: s.producto_id,
+          nombre: s.nombre,
+          // 👇 override de precios: usamos el proporcional del combo
+          precio: Number(precioUnitProporcional),
+          precio_con_descuento: Number(precioUnitProporcional),
+          descuento_porcentaje: 0,
+          cantidad_disponible: Number(s.cantidad_disponible || 0),
+          codigo_sku: s.codigo_sku,
+          categoria_id: s.categoria_id,
+          local_id: s.local_id // si tu back lo devuelve
+        };
 
-          const talle = {
-            id: talleDisponible.talle_id,
-            nombre: talleDisponible.talle_nombre,
-            cantidad: talleDisponible.cantidad_disponible,
-            stock_id: talleDisponible.stock_id
-          };
+        return item;
+      });
 
-          // 👇 Agregar al carrito
-          agregarAlCarrito(productoData, talle, false);
+      const items = (await Promise.all(consultas)).filter(Boolean);
 
-          // 👇 Agregar al listado para combosSeleccionados
-          productosSeleccionados.push({
-            stock_id: talleDisponible.stock_id
-          });
+      if (!items.length) {
+        alert(
+          'No hay stock disponible en tu sucursal para los productos del combo.'
+        );
+        return;
+      }
+
+      // 5) Agregar cada item al carrito (usarDesc = false para combos)
+      const usados = [];
+      for (const it of items) {
+        if (!it.cantidad_disponible) continue;
+        agregarAlCarrito(it, false); // 👈 sin descuento por producto
+        usados.push({ stock_id: it.stock_id });
+      }
+
+      if (!usados.length) {
+        alert('Los productos del combo no tienen stock disponible.');
+        return;
+      }
+
+      // 6) Registrar el combo seleccionado (para enviarlo al back)
+      setCombosSeleccionados((prev) => [
+        ...prev,
+        {
+          combo_id: combo.id,
+          precio_combo: Number(combo.precio_fijo),
+          productos: usados
         }
-      }
-
-      // 🔥 Guardar combo seleccionado con sus productos usados
-      if (productosSeleccionados.length > 0) {
-        setCombosSeleccionados((prev) => [
-          ...prev,
-          {
-            combo_id: combo.id,
-            precio_combo: parseFloat(combo.precio_fijo),
-            productos: productosSeleccionados
-          }
-        ]);
-      }
+      ]);
 
       setModalVerCombosOpen(false);
     } catch (error) {
       console.error('Error al seleccionar combo:', error);
+      alert('Ocurrió un error al seleccionar el combo.');
     }
   };
 
@@ -553,53 +591,50 @@ export default function PuntoVenta() {
     }
     if (!window.confirm('¿Deseás registrar la venta?')) return;
 
+    // 🟢 carrito está en modo "stock": cada item tiene stock_id, precio, precio_con_descuento, etc.
     const productosRequest = carrito.map((item) => {
-      const precioOriginal = item.producto?.precio || item.precio; // fallback si no tenés producto.precio
-      const precioFinal = item.precio_con_descuento ?? item.precio;
-      const descuento = precioOriginal - precioFinal;
+      const precioOriginal = Number(item.precio ?? 0); // ya no dependas de item.producto?.precio
+      const precioFinal = Number(item.precio_con_descuento ?? item.precio ?? 0);
+      const descuento = Math.max(0, precioOriginal - precioFinal);
       const descuentoPorcentaje =
-        descuento > 0 && precioOriginal > 0
-          ? (descuento / precioOriginal) * 100
-          : 0;
+        precioOriginal > 0 ? (descuento / precioOriginal) * 100 : 0;
 
       return {
         stock_id: item.stock_id,
-        cantidad: item.cantidad,
+        cantidad: Number(item.cantidad || 0),
         precio_unitario: precioOriginal,
-        descuento: descuento,
+        descuento: Number(descuento.toFixed(2)),
         descuento_porcentaje: descuentoPorcentaje.toFixed(2),
         precio_unitario_con_descuento: precioFinal
       };
     });
 
-    // 🔢 Calcular orígenes de descuento
+    // 🔢 Orígenes de descuento
     const origenes_descuento = [];
 
-    // 1. Descuentos por producto
+    // 1) Por producto (snapshot guardado en cada línea)
     carrito.forEach((item) => {
-      if (item.descuentoPorcentaje && item.descuentoPorcentaje > 0) {
+      const pct = Number(item.descuentoPorcentaje || 0);
+      if (pct > 0) {
         origenes_descuento.push({
           tipo: 'producto',
           referencia_id: item.producto_id ?? null,
-          detalle: item.nombre ?? 'Producto sin nombre',
-          porcentaje: item.descuentoPorcentaje,
-          monto:
-            item.descuentoPorcentaje > 0
-              ? (item.precio_original * item.descuentoPorcentaje) / 100
-              : 0
+          detalle: item.nombre ?? 'Producto',
+          porcentaje: pct,
+          monto: (Number(item.precio_original || item.precio || 0) * pct) / 100
         });
       }
     });
 
-    // Bandera si hay descuento manual
+    // ¿hay descuento manual?
     const hayDescuentoManual =
       aplicarDescuento &&
       descuentoPersonalizado !== '' &&
       parseFloat(descuentoPersonalizado) > 0;
 
-    // 2. Descuento por medio de pago (solo si NO hay manual)
+    // 2) Por medio de pago (solo si NO hay manual)
     if (
-      aplicarDescuento && // esta es la condición clave
+      aplicarDescuento &&
       !hayDescuentoManual &&
       totalCalculado.ajuste_porcentual !== 0
     ) {
@@ -614,16 +649,15 @@ export default function PuntoVenta() {
       });
     }
 
-    // 3. Descuento manual (tiene prioridad)
+    // 3) Manual (tiene prioridad)
     if (hayDescuentoManual) {
+      const pct = parseFloat(descuentoPersonalizado);
       origenes_descuento.push({
         tipo: 'manual',
         referencia_id: null,
         detalle: 'Descuento personalizado',
-        porcentaje: parseFloat(descuentoPersonalizado),
-        monto:
-          (totalCalculado.precio_base * parseFloat(descuentoPersonalizado)) /
-          100
+        porcentaje: pct,
+        monto: (totalCalculado.precio_base * pct) / 100
       });
     }
 
@@ -635,7 +669,7 @@ export default function PuntoVenta() {
       cliente_id: clienteSeleccionado ? clienteSeleccionado.id : null,
       productos: productosRequest,
       combos: combosSeleccionados,
-      total: totalFinalCalculado, // Total sin descuentos ni recargos
+      total: totalFinalCalculado,
       medio_pago_id: medioPago,
       usuario_id: userId,
       local_id: userLocalId,
@@ -649,8 +683,8 @@ export default function PuntoVenta() {
         aplicarDescuento && totalCalculado.ajuste_porcentual > 0
           ? totalCalculado.ajuste_porcentual
           : 0,
-      aplicar_descuento: aplicarDescuento, // Flag para backend
-      origenes_descuento: origenes_descuento,
+      aplicar_descuento: aplicarDescuento,
+      origenes_descuento,
       cuotas: totalCalculado.cuotas,
       monto_por_cuota: totalCalculado?.monto_por_cuota ?? null,
       porcentaje_recargo_cuotas: totalCalculado?.porcentaje_recargo_cuotas ?? 0,
@@ -667,9 +701,8 @@ export default function PuntoVenta() {
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await response.json().catch(() => ({}));
         const msg = error.mensajeError || 'Error al registrar la venta';
-
         if (msg.toLowerCase().includes('caja abierta')) {
           setMensajeCaja(msg);
           setMostrarModalCaja(true);
@@ -679,23 +712,24 @@ export default function PuntoVenta() {
         return;
       }
 
+      // 🧹 limpiar UI
       setCarrito([]);
       setBusqueda('');
-      // 👇 LIMPIÁ el input de descuento y el radio
       setDescuentoPersonalizado('');
       setAplicarDescuento(false);
+
+      // 🔁 refrescar resultados de búsqueda SIN agrupar
       if (busqueda.trim() !== '') {
-        fetch(
+        const res2 = await fetch(
           `http://localhost:8080/buscar-productos-detallado?query=${encodeURIComponent(
             busqueda
           )}`
-        )
-          .then((res) => res.json())
-          .then((data) => {
-            const agrupados = agruparProductosConTalles(data);
-            setProductos(agrupados);
-          });
+        );
+        const data2 = await res2.json().catch(() => []);
+        // ⛔️ ya no uses agruparProductosConTalles
+        setProductos(Array.isArray(data2) ? data2 : []);
       }
+
       const data = await response.json();
       const ventaId = data.venta_id;
 
@@ -739,41 +773,47 @@ export default function PuntoVenta() {
 
   const abrirModalNuevoCliente = () => setModalNuevoClienteOpen(true);
 
-  const buscarProductoPorCodigo = (codigo) => {
-    if (!codigo) return;
+  const buscarProductoPorCodigo = async (codigo) => {
+    const q = String(codigo ?? '').trim();
+    if (!q) return;
 
-    fetch(
-      `http://localhost:8080/buscar-productos-detallado?query=${encodeURIComponent(
-        codigo
-      )}`
-    )
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
-          // Elegimos el primer resultado (el código debe ser único)
-          const prod = data[0];
-          // Llamamos a tu función para sumar al carrito, con la info correcta
-          agregarAlCarrito(
-            {
-              producto_id: prod.producto_id,
-              nombre: prod.nombre,
-              precio: prod.precio
-            },
-            {
-              stock_id: prod.stock_id,
-              id: prod.talle_id,
-              nombre: prod.talle_nombre,
-              cantidad: prod.cantidad_disponible
-            }
-          );
-        } else {
-          alert('Producto no encontrado o sin stock');
-        }
-      })
-      .catch((err) => {
-        console.error('Error al buscar producto por código:', err);
-        alert('Error al buscar producto');
-      });
+    const params = new URLSearchParams({
+      query: q,
+      local_id: String(userLocalId || '') // 👈 enviar local
+    });
+
+    try {
+      const res = await fetch(
+        `http://localhost:8080/buscar-productos-detallado?${params.toString()}`
+      );
+      if (!res.ok) throw new Error(`Error ${res.status} al buscar producto`);
+
+      const data = await res.json();
+      if (!Array.isArray(data) || data.length === 0) {
+        alert('Producto no encontrado o sin stock en tu local');
+        return;
+      }
+
+      const prod = data[0]; // el primero basta si el SKU es único dentro del local
+
+      const item = {
+        stock_id: prod.stock_id,
+        producto_id: prod.producto_id,
+        nombre: prod.nombre,
+        precio: Number(prod.precio),
+        descuento_porcentaje: Number(prod.descuento_porcentaje || 0),
+        precio_con_descuento: Number(prod.precio_con_descuento ?? prod.precio),
+        cantidad_disponible: Number(prod.cantidad_disponible || 0),
+        codigo_sku: prod.codigo_sku,
+        categoria_id: prod.categoria_id
+      };
+
+      const usarDesc = true;
+      agregarAlCarrito(item, usarDesc);
+    } catch (err) {
+      console.error('Error al buscar producto por código:', err);
+      alert(err.message || 'Error al buscar producto');
+    }
   };
 
   // Si el input pierde el foco, volvelo a enfocar después de un pequeño delay
@@ -1009,13 +1049,19 @@ export default function PuntoVenta() {
                       <>{formatearPrecio(producto.precio)}</>
                     )}
                   </span>
-
+                  {console.log(producto)}
                   <button
                     onClick={() =>
                       manejarAgregarProducto(producto, usarDescuento)
                     }
-                    className="absolute top-2 right-2 bg-emerald-500 hover:bg-emerald-600 text-white p-2 rounded-full shadow"
-                    title="Agregar al carrito"
+                    className="absolute top-2 right-2 bg-emerald-500 hover:bg-emerald-600 text-white p-2 rounded-full shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={
+                      producto.cantidad_disponible
+                        ? 'Agregar al carrito'
+                        : 'Sin stock'
+                    }
+                    disabled={!producto.cantidad_disponible}
+                    aria-label="Agregar al carrito"
                   >
                     <FaPlus />
                   </button>
@@ -1272,7 +1318,7 @@ export default function PuntoVenta() {
             <div className="flex justify-between items-center mb-4">
               <h3
                 id="modalTitle"
-                className="text-2xl font-semibold text-gray-900 select-none"
+                className="text-2xl titulo uppercase font-semibold text-gray-900 select-none"
               >
                 Seleccioná un producto
               </h3>
@@ -1401,7 +1447,7 @@ export default function PuntoVenta() {
             <div className="flex justify-between items-center mb-4">
               <h3
                 id="modalCombosTitle"
-                className="text-2xl font-semibold text-gray-900 select-none"
+                className="text-2xl titulo uppercase font-semibold text-gray-900 select-none"
               >
                 Seleccioná un combo
               </h3>
