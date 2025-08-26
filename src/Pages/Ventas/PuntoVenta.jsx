@@ -25,6 +25,8 @@ import axios from 'axios';
 import { useAuth } from '../../AuthContext'; // Ajustá el path si es necesario
 import TicketVentaModal from './Config/TicketVentaModal';
 import TotalConOpciones from './Components/TotalConOpciones';
+import ModalOtrosLocales from './Components/ModalOtrosLocales';
+import { useDebouncedValue } from '../../utils/useDebouncedValue';
 
 const toNum = (v, d = 0) => {
   const n = Number(v);
@@ -100,8 +102,6 @@ export default function PuntoVenta() {
   const [productos, setProductos] = useState([]); // Productos agrupados con talles
   const [carrito, setCarrito] = useState([]);
 
-  const [modalProducto, setModalProducto] = useState(null);
-
   const [talleSeleccionado, setTalleSeleccionado] = useState(null);
 
   const [modalVerProductosOpen, setModalVerProductosOpen] = useState(false);
@@ -109,50 +109,86 @@ export default function PuntoVenta() {
   const [ventaFinalizada, setVentaFinalizada] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    let ignore = false;
+  const [otrosLocales, setOtrosLocales] = useState([]); // items de otras sucursales
+  const [modalOtrosOpen, setModalOtrosOpen] = useState(false);
 
-    const delay = setTimeout(() => {
-      const q = busqueda.trim();
-      if (!q) {
-        setProductos([]);
-        return;
-      }
+  const debouncedBusqueda = useDebouncedValue(busqueda, 600); // ⬅️ pausa de 400ms
 
+useEffect(() => {
+  let ignore = false;
+  const controller = new AbortController();
+  const q = (debouncedBusqueda || '').trim();
+
+  // umbral mínimo de caracteres opcional
+  if (q.length < 2) {
+    setProductos([]);
+    setOtrosLocales([]);
+    setModalOtrosOpen(false);
+    return () => controller.abort();
+  }
+
+  (async () => {
+    try {
       setLoading(true);
 
-      // 🔹 Construimos la URL con query + local_id
-      const url = `http://localhost:8080/buscar-productos-detallado?query=${encodeURIComponent(
-        q
-      )}&local_id=${userLocalId}`;
+      const params = new URLSearchParams({
+        query: q,
+        local_id: String(userLocalId || ''),
+        include_otros: '1'
+      });
 
-      fetch(url)
-        .then((res) => {
-          if (!res.ok) {
-            throw new Error(`Error ${res.status}`);
-          }
-          return res.json();
-        })
-        .then((data) => {
-          if (!ignore) {
-            // ✅ Guardar items tal cual vienen del back
-            setProductos(Array.isArray(data) ? data : []);
-          }
-        })
-        .catch((err) => {
-          console.error('Error al buscar productos:', err);
-          if (!ignore) setProductos([]);
-        })
-        .finally(() => {
-          if (!ignore) setLoading(false);
-        });
-    }, 0); // Si querés evitar spam de requests, podés poner 350ms
+      const res = await fetch(
+        `http://localhost:8080/buscar-productos-detallado?${params}`,
+        { signal: controller.signal }
+      );
+      if (!res.ok) throw new Error(`Error ${res.status}`);
 
-    return () => {
-      clearTimeout(delay);
-      ignore = true;
-    };
-  }, [busqueda, userLocalId]);
+      const payload = await res.json();
+
+      let itemsLocal = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload.items_local)
+        ? payload.items_local
+        : [];
+
+      let itemsOtros = Array.isArray(payload?.otros_items)
+        ? payload.otros_items
+        : [];
+
+      if (ignore) return;
+
+      setProductos(itemsLocal);
+      setOtrosLocales(itemsOtros);
+
+      // 🔔 Abrir modal SOLO si el usuario hizo pausa (debounce),
+      // no hay stock local y sí hay en otras sucursales.
+      setModalOtrosOpen(itemsLocal.length === 0 && itemsOtros.length > 0);
+    } catch (e) {
+      if (e.name !== 'AbortError') {
+        console.error('Error al buscar productos:', e);
+        if (!ignore) {
+          setProductos([]);
+          setOtrosLocales([]);
+          setModalOtrosOpen(false);
+        }
+      }
+    } finally {
+      if (!ignore) setLoading(false);
+    }
+  })();
+
+  return () => {
+    ignore = true;
+    controller.abort(); // ⛔ cancela la request anterior si el user sigue tipeando
+  };
+}, [debouncedBusqueda, userLocalId]);
+
+  // cuando no hay stock local pero sí otros
+  useEffect(() => {
+    if (productos.length === 0 && otrosLocales.length > 0) {
+      setModalOtrosOpen(true);
+    }
+  }, [productos, otrosLocales]);
 
   // Agregar producto al carrito
   // item esperado: {
@@ -218,9 +254,6 @@ export default function PuntoVenta() {
 
       return [...prev, nuevaLinea];
     });
-
-    // Si ya no usás modal de talles, esto es inofensivo pero lo podés quitar:
-    setModalProducto?.(null);
   };
 
   // Manejo click para agregar producto (modal si tiene varios talles)
@@ -1207,102 +1240,6 @@ export default function PuntoVenta() {
         </div>
       </div>
 
-      {/* Modal para seleccionar talle si hay más de uno */}
-      {modalProducto && modalProducto.talles && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="modal-title"
-          className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4"
-        >
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-lg animate-fadeIn">
-            {/* Título */}
-            <h3
-              id="modal-title"
-              className="uppercase text-2xl font-bold mb-5 text-center text-gray-800"
-            >
-              Selección de{' '}
-              <span className="text-emerald-600">{modalProducto.nombre}</span>
-            </h3>
-
-            {/* Lista talles */}
-            <div className="flex flex-col gap-3 max-h-72 overflow-y-auto scrollbar-thin scrollbar-thumb-emerald-400 scrollbar-track-gray-100">
-              {modalProducto.talles.map((talle) => {
-                const selected = talleSeleccionado?.id === talle.id;
-                return (
-                  <button
-                    key={talle.id}
-                    onClick={() => setTalleSeleccionado(talle)}
-                    className={`flex justify-between items-center p-4 rounded-lg border transition-shadow focus:outline-none ${
-                      selected
-                        ? 'bg-emerald-600 text-white border-emerald-700 shadow-lg'
-                        : 'bg-gray-50 text-gray-800 border-gray-300 hover:bg-gray-100'
-                    }`}
-                    aria-pressed={selected}
-                    type="button"
-                  >
-                    <span className="text-lg font-semibold">
-                      {talle.nombre}
-                    </span>
-                    <span className="text-sm font-medium opacity-75">
-                      {talle.cantidad} disponibles
-                    </span>
-                    {selected && (
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-6 w-6"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={3}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Botones */}
-            <div className="mt-6 flex justify-end gap-4">
-              <button
-                onClick={() => {
-                  setModalProducto(null);
-                  setTalleSeleccionado(null);
-                }}
-                className="px-5 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition"
-                type="button"
-              >
-                Cancelar
-              </button>
-              <button
-                disabled={!talleSeleccionado}
-                onClick={() =>
-                  agregarAlCarrito(
-                    modalProducto,
-                    talleSeleccionado,
-                    modalUsarDescuento // este estado debe existir
-                  )
-                }
-                className={`px-6 py-2 rounded-lg font-semibold text-white transition ${
-                  talleSeleccionado
-                    ? 'bg-emerald-600 hover:bg-emerald-700'
-                    : 'bg-emerald-300 cursor-not-allowed'
-                }`}
-                type="button"
-              >
-                Agregar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {modalVerProductosOpen && (
         <div
           role="dialog"
@@ -1643,6 +1580,18 @@ export default function PuntoVenta() {
           </div>
         </div>
       )}
+
+      <ModalOtrosLocales
+        open={modalOtrosOpen}
+        onClose={() => setModalOtrosOpen(false)}
+        productos={otrosLocales}
+        userId={userId}
+        userLocalId={userLocalId}
+        onRequested={(pedidoId) => {
+          // opcional: refrescá listados/contadores
+          // loadPedidos();
+        }}
+      />
     </div>
   );
 }

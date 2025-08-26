@@ -65,6 +65,7 @@ import CombosGet from './Pages/Stock/Combos/CombosGet';
 import ComboEditarPermitidos from './Pages/Stock/Combos/ComboEditarPermitidos';
 import Home from './Pages/Home';
 import LogsSistema from './Pages/MetodosGets/LogsSistema';
+import PedidosStockPanel from './Pages/Stock/PedidosStockPanel';
 
 function AppContent() {
   const { hideLayoutFooter, hideLayoutNav } = useLayoutVisibility();
@@ -182,6 +183,14 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 <ComboEditarPermitidos />
+              </ProtectedRoute>
+            }
+          />
+          <Ruta
+            path="/dashboard/stock/pedidos"
+            element={
+              <ProtectedRoute>
+                <PedidosStockPanel />
               </ProtectedRoute>
             }
           />
