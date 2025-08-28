@@ -760,7 +760,7 @@ useEffect(() => {
         );
         const data2 = await res2.json().catch(() => []);
         // ⛔️ ya no uses agruparProductosConTalles
-        setProductos(Array.isArray(data2) ? data2 : []);
+        // setProductos(Array.isArray(data2) ? data2 : []);
       }
 
       const data = await response.json();
