@@ -867,7 +867,7 @@ const StockGet = () => {
                 <h2 className="text-xl font-bold text-cyan-300 mb-1 uppercase">
                   {producto?.nombre}
                 </h2>
-                <p className="text-sm">ID: {producto?.id}</p>
+                <p className="text-sm">ID PRODUCTO: {producto?.id}</p>
                 <p className="text-sm">Local: {local?.nombre}</p>
                 {otrosLocalesConStock.length > 0 && (
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
