@@ -30,7 +30,7 @@ export default function MovimientosGlobal() {
     setLoading(true);
 
     const endpoint =
-      userLevel === 'admin'
+      userLevel === 'socio'
         ? 'http://localhost:8080/movimientos_caja'
         : `http://localhost:8080/movimientos_caja?local_id=${userLocalId}`;
 
@@ -89,16 +89,26 @@ export default function MovimientosGlobal() {
     URL.revokeObjectURL(url);
   };
 
+  // cuando el modal guarda cambios:
   const handleUpdate = (movActualizado) => {
-    setMovimientos((movs) =>
-      movs.map((m) =>
+    // 1) actualizar la lista
+    setMovimientos((prev) =>
+      prev.map((m) =>
         m.id === movActualizado.id ? { ...m, ...movActualizado } : m
       )
     );
+    // 2) actualizar lo que ve el modal
+    setDetalle((prev) =>
+      prev && prev.id === movActualizado.id
+        ? { ...prev, ...movActualizado }
+        : prev
+    );
   };
 
+  // cuando el modal elimina
   const handleDelete = (id) => {
-    setMovimientos((movs) => movs.filter((m) => m.id !== id));
+    setMovimientos((prev) => prev.filter((m) => m.id !== id));
+    setDetalle(null);
   };
 
   return (
@@ -146,7 +156,7 @@ export default function MovimientosGlobal() {
             <option value="ingreso">Ingresos</option>
             <option value="egreso">Egresos</option>
           </select>
-          {userLevel === 'admin' && (
+          {userLevel === 'socio' && (
             <select
               className="rounded-lg px-3 py-2 bg-[#23253a] text-white text-sm"
               value={localFiltro}

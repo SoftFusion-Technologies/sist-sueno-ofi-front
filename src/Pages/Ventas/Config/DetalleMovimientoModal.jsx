@@ -14,6 +14,29 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { useAuth } from '../../../AuthContext';
+
+const fmtARS = (n) =>
+  new Intl.NumberFormat('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+    minimumFractionDigits: 2
+  }).format(Number(n || 0));
+
+const parseARS = (s) => {
+  // quita todo menos dígitos, signos, coma, punto
+  const cleaned = String(s).replace(/[^\d,.,-]/g, '');
+  // quita separadores de miles y usa punto como decimal
+  const normalized = cleaned.replace(/\./g, '').replace(',', '.');
+  const n = parseFloat(normalized);
+  return isNaN(n) ? 0 : n;
+};
+
+const toARSInput = (n) =>
+  new Intl.NumberFormat('es-AR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(Number(n || 0)); // ej: 12.345,67 (sin $)
+
 const tipoIcons = {
   ingreso: <FaArrowUp className="text-emerald-400" />,
   egreso: <FaArrowDown className="text-red-400" />
@@ -35,12 +58,21 @@ const tipoBadge = (tipo) => (
 
 function DetalleMovimientoModal({ movimiento, onClose, onUpdate, onDelete }) {
   const [edit, setEdit] = useState(false);
-  const [form, setForm] = useState({ ...movimiento });
-  const { userLevel } = useAuth();
+  const [form, setForm] = useState({
+    ...movimiento,
+    monto: Number(movimiento?.monto ?? 0),
+    montoStr: toARSInput(movimiento?.monto ?? 0)
+  });
+
   useEffect(() => {
-    setForm({ ...movimiento });
+    setForm({
+      ...movimiento,
+      monto: Number(movimiento?.monto ?? 0),
+      montoStr: toARSInput(movimiento?.monto ?? 0)
+    });
     setEdit(false);
   }, [movimiento]);
+  const { userId, userLevel } = useAuth();
 
   if (!movimiento) return null;
 
@@ -52,7 +84,7 @@ function DetalleMovimientoModal({ movimiento, onClose, onUpdate, onDelete }) {
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form)
+          body: JSON.stringify({ ...form, usuario_id: userId }) // 👈 pasamos usuario_id
         }
       );
       if (res.ok) {
@@ -65,11 +97,19 @@ function DetalleMovimientoModal({ movimiento, onClose, onUpdate, onDelete }) {
   // CRUD - Eliminar movimiento
   const handleDelete = async () => {
     if (!window.confirm('¿Seguro que deseas eliminar este movimiento?')) return;
-    await fetch(`http://localhost:8080/movimientos_caja/${movimiento.id}`, {
-      method: 'DELETE'
-    });
-    onDelete(movimiento.id);
-    onClose();
+
+    try {
+      await fetch(`http://localhost:8080/movimientos_caja/${movimiento.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usuario_id: userId }) // 👈 pasamos usuario_id
+      });
+
+      onDelete(movimiento.id);
+      onClose();
+    } catch (err) {
+      console.error('Error al eliminar movimiento:', err);
+    }
   };
 
   return (
@@ -121,19 +161,28 @@ function DetalleMovimientoModal({ movimiento, onClose, onUpdate, onDelete }) {
                 {movimiento.tipo === 'ingreso' ? '+' : '-'}
                 {edit ? (
                   <input
-                    className="inline-block bg-[#22262f] border-b-2 border-emerald-400 rounded px-2 py-1 w-24 text-right text-lg font-bold outline-none text-emerald-200 animate-pulse"
-                    type="number"
-                    value={form.monto}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, monto: e.target.value }))
+                    className="inline-block bg-[#22262f] border-b-2 border-emerald-400 rounded px-2 py-1 w-32 text-right text-lg font-bold outline-none text-emerald-200"
+                    type="text"
+                    inputMode="decimal"
+                    value={form.montoStr}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setForm((f) => ({
+                        ...f,
+                        montoStr: v, // lo que ve/edita
+                        monto: parseARS(v) // lo que guardás
+                      }));
+                    }}
+                    onBlur={() =>
+                      setForm((f) => ({
+                        ...f,
+                        montoStr: toARSInput(f.monto) // normaliza al salir
+                      }))
                     }
                     autoFocus
                   />
                 ) : (
-                  parseFloat(movimiento.monto).toLocaleString('es-AR', {
-                    style: 'currency',
-                    currency: 'ARS'
-                  })
+                  fmtARS(movimiento.monto)
                 )}
               </span>
             </div>
@@ -194,7 +243,7 @@ function DetalleMovimientoModal({ movimiento, onClose, onUpdate, onDelete }) {
             </div>
             {/* ACCIONES */}
             <div className="flex gap-2 mt-8 mb-1 justify-end sticky bottom-2">
-              {userLevel === 'admin' &&
+              {userLevel === 'socio' &&
                 (edit ? (
                   <button
                     onClick={handleUpdate}

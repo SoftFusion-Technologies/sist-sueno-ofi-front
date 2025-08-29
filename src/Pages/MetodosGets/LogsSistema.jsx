@@ -32,12 +32,15 @@ const LogsSistema = () => {
     'editar',
     'eliminar',
     'aplicar-descuento',
-    'ajuste de precios'
+    'ajuste de precios',
+    'cerrar',
+    'actualizar'
   ];
 
   const modulos = [
     'usuarios',
     'ventas',
+    'caja',
     'clientes',
     'productos',
     'locales',

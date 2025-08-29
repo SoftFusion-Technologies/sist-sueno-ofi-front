@@ -158,7 +158,8 @@ export default function CajaPOS() {
         caja_id: cajaActual.id,
         tipo: nuevoMovimiento.tipo,
         descripcion: nuevoMovimiento.descripcion,
-        monto: Number(nuevoMovimiento.monto)
+        monto: Number(nuevoMovimiento.monto),
+        usuario_id: userId // 👈 necesario para el log
       });
       const mov = await axios.get(
         `http://localhost:8080/movimientos/caja/${cajaActual.id}`
