@@ -35,98 +35,51 @@ import formatearFechaARG from '../../Components/formatearFechaARG';
 import { useAuth } from '../../AuthContext.jsx';
 Modal.setAppElement('#root');
 
-// --- Función para formatear teléfono:
-function formatDisplayPhone(num) {
-  // Saca todo lo que no es número
-  let n = num.replace(/\D/g, '');
+const displayPhone = (raw = '') =>
+  raw
+    .replace(/[^\d]/g, '')
+    .replace(/^0+/, '')
+    .replace(/(\d{2,4})(\d{6,8})/, '$1-$2');
 
-  // Si ya empieza con 54, asumimos formato internacional argentino
-  if (n.length === 13 && n.startsWith('54')) {
-    // +54 9 3863 41-4717
-    return `+${n.slice(0, 2)} ${n[2]} ${n.slice(3, 7)} ${n.slice(
-      7,
-      9
-    )}-${n.slice(9, 13)}`;
-  }
+const toWhatsAppNumber = (raw = '') => {
+  // Normaliza a AR: +54 + número sin 0/15
+  let n = raw.replace(/[^\d]/g, '');
+  n = n.replace(/^0+/, '').replace(/^15/, ''); // quita 0/15
+  return `54${n}`; // sin "+"
+};
 
-  // +549...
-  if (n.length === 12 && n.startsWith('549')) {
-    return `+${n.slice(0, 2)} ${n[2]} ${n.slice(3, 7)} ${n.slice(
-      7,
-      9
-    )}-${n.slice(9, 12)}`;
-  }
+const mapsLink = (addr = '') =>
+  addr
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+        addr
+      )}`
+    : '#';
 
-  // 11 dígitos típico móvil Arg: 38653488333 → +54 9 3865 34-8833
-  if (n.length === 11) {
-    return `+54 9 ${n.slice(0, 4)} ${n.slice(4, 6)}-${n.slice(6, 10)}`;
-  }
+const safe = (v, fallback = '—') => (v && String(v).trim() ? v : fallback);
 
-  // 10 dígitos típico fijo Arg: 3816583391 → +54 3816 58-3391
-  if (n.length === 10) {
-    return `+54 ${n.slice(0, 4)} ${n.slice(4, 6)}-${n.slice(6, 10)}`;
-  }
+const copyToClipboard = async (text) => {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {}
+};
 
-  // 8 ó 7 dígitos, local corto
-  if (n.length === 8) {
-    return `${n.slice(0, 4)}-${n.slice(4, 8)}`;
-  }
-  if (n.length === 7) {
-    return `${n.slice(0, 3)}-${n.slice(3, 7)}`;
-  }
+const initials = (name = '') =>
+  name
+    .split(' ')
+    .map((p) => p[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
 
-  // Si no, devolvé como está, pero podés agregarle prefijo si querés
-  return num;
-}
+const abreviar = (txt, len = 54) =>
+  txt && txt.length > len ? txt.slice(0, len - 1) + '…' : txt || '—';
 
-function TelCell({ telefono }) {
-  const [copied, setCopied] = useState(false);
-
-  // Lógica igual que antes
-  const raw = telefono.replace(/\D/g, '');
-  const link = `https://wa.me/${raw.startsWith('54') ? raw : '54' + raw}`;
-  const display = formatDisplayPhone(telefono);
-
-  const copyToClipboard = async () => {
-    try {
-      await navigator.clipboard.writeText(display);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1200);
-    } catch {}
-  };
-
-  return (
-    <div className="flex items-center justify-center">
-      <a
-        href={link}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center gap-2 bg-[#25D366]/10 border border-[#25D366] rounded-full px-4 py-2 font-bold text-emerald-200 hover:bg-[#25D366]/20 hover:text-white shadow-sm transition-all whitespace-nowrap"
-        title="Enviar WhatsApp"
-        style={{ fontSize: '1.1em', letterSpacing: '0.02em' }}
-      >
-        <FaWhatsapp className="text-[#25D366] text-xl mr-2" />
-        <span className="font-bold tracking-wider">{display}</span>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            copyToClipboard();
-          }}
-          className="ml-2 text-xs text-gray-400 hover:text-emerald-200 transition"
-          title="Copiar número"
-          tabIndex={-1}
-        >
-          {copied ? (
-            <FaCheckCircle className="text-emerald-400 text-lg" />
-          ) : (
-            <FaRegCopy className="text-lg" />
-          )}
-        </button>
-      </a>
-    </div>
-  );
-}
+const copiar = async (valor) => {
+  try {
+    await navigator.clipboard.writeText(valor);
+  } catch {}
+};
 
 export default function ClientesGet() {
   const { userId } = useAuth();
@@ -370,7 +323,7 @@ export default function ClientesGet() {
           </div>
         </div>
       </div>
-      {/* Cards-table para desktop */}
+      {/* Cards-table para desktop (refactor UX) */}
       <div className="hidden md:block">
         <div className="grid grid-cols-1 gap-4 max-w-6xl mx-auto mt-6">
           {filtered.length === 0 ? (
@@ -381,70 +334,79 @@ export default function ClientesGet() {
             filtered.map((c) => (
               <motion.div
                 key={c.id}
-                className="flex w-full min-h-[140px] bg-white/70 shadow-xl rounded-3xl border-l-8 transition-all border-emerald-500/80 hover:scale-[1.012] hover:shadow-2xl overflow-hidden"
+                className="flex w-full min-h-[140px] rounded-3xl overflow-hidden bg-white/80 shadow-xl border border-emerald-100 hover:shadow-emerald-200/60 transition-all hover:scale-[1.01]"
                 initial={{ opacity: 0, y: 18 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.28 }}
+                transition={{ duration: 0.22 }}
               >
-                {/* Identidad */}
-                <div className="flex flex-col justify-between items-start p-7 w-64 bg-gradient-to-br from-emerald-700/90 to-emerald-900/90 text-white">
-                  <div>
-                    <div className="text-xl font-extrabold flex items-center gap-2 drop-shadow-sm">
-                      {c.nombre}
-                      {c.pagado === 'SI' ? (
-                        <span className="ml-2 flex items-center bg-emerald-200 text-emerald-900 rounded-full px-3 py-0.5 text-xs font-bold shadow animate-pulse">
-                          <svg
-                            className="w-4 h-4 mr-1 inline"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="3"
-                              d="M5 13l4 4L19 7"
-                            />
-                          </svg>
-                          Pagado
-                        </span>
-                      ) : (
-                        <span className="ml-2 flex items-center bg-rose-500 text-white rounded-full px-3 py-0.5 text-xs font-bold shadow animate-pulse">
-                          <svg
-                            className="w-4 h-4 mr-1 inline"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <circle cx="12" cy="12" r="10" />
-                            <line x1="15" y1="9" x2="9" y2="15" />
-                            <line x1="9" y1="9" x2="15" y2="15" />
-                          </svg>
-                          Pendiente
-                        </span>
-                      )}
+                {/* Columna izquierda: identidad */}
+                <div className="flex flex-col justify-center items-start gap-3 p-7 w-72 bg-gradient-to-br from-emerald-700 via-emerald-800 to-emerald-900 text-white">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center font-extrabold shadow-inner">
+                      {initials(c.nombre)}
                     </div>
-                    <div className="mt-1 opacity-90 text-base">{c.email}</div>
-                    <div className="flex items-center gap-2 mt-1 text-sm opacity-90">
-                      {c.telefono}
+                    <div>
+                      <div className="text-lg font-extrabold leading-tight">
+                        {c.nombre || '—'}
+                      </div>
+                      <div className="opacity-90 text-sm">
+                        {c.email || 'sin email'}
+                      </div>
                     </div>
-                    <div className="text-xs text-emerald-200 mt-2">
-                      <span className="opacity-80">DNI:</span> {c.dni}
-                    </div>
+                  </div>
+                  <div className="text-sm flex items-center gap-2">
+                    <button
+                      className="px-2 py-0.5 rounded-lg bg-white/15 hover:bg-white/25 transition text-white/95"
+                      title="Llamar"
+                      onClick={() =>
+                        c.telefono
+                          ? (window.location.href = `tel:${c.telefono}`)
+                          : null
+                      }
+                    >
+                      {c.telefono || 'sin teléfono'}
+                    </button>
+                    {c.telefono && (
+                      <button
+                        onClick={() => copiar(c.telefono)}
+                        className="text-xs px-2 py-0.5 rounded-md bg-black/20 hover:bg-black/30"
+                        title="Copiar teléfono"
+                      >
+                        Copiar
+                      </button>
+                    )}
+                  </div>
+                  <div className="text-xs text-emerald-200">
+                    <span className="opacity-80">DNI:</span>{' '}
+                    <button
+                      className="underline decoration-dotted underline-offset-4 hover:text-white transition"
+                      onClick={() => c.dni && copiar(c.dni)}
+                      title="Copiar DNI"
+                    >
+                      {c.dni || '—'}
+                    </button>
                   </div>
                 </div>
 
-                {/* Detalle */}
-                <div className="flex-1 grid grid-cols-4 gap-6 px-8 py-6 bg-white/80 backdrop-blur-lg text-gray-800 items-center text-sm">
+                {/* Centro: datos */}
+                <div className="flex-1 grid grid-cols-3 gap-6 px-8 py-6 bg-white/80 backdrop-blur-lg text-gray-800 items-center text-sm">
+                  <div>
+                    <div className="text-xs text-gray-500 font-semibold">
+                      Dirección
+                    </div>
+                    <div className="text-base">{abreviar(c.direccion, 64)}</div>
+                  </div>
                   <div>
                     <div className="text-xs text-gray-500 font-semibold">
                       Fecha Alta
                     </div>
-                    <div className="text-base mb-5">
+                    <div className="text-base">
                       {formatearFechaARG(c.fecha_alta)}
                     </div>
+                  </div>
+                  <div>
                     <div className="text-xs text-gray-500 font-semibold">
-                      Fecha Última Compra
+                      Última Compra
                     </div>
                     <div className="text-base">
                       {formatearFechaARG(c.fecha_ultima_compra)}
@@ -452,16 +414,16 @@ export default function ClientesGet() {
                   </div>
                 </div>
 
-                <button
-                  className="text-red-500 mt-4 text-xs font-semibold hover:text-red-600 transition"
-                  onClick={() => openDetalleCliente(c)}
-                  title="Ver detalle del cliente"
-                >
-                  Ver detalle
-                </button>
-
-                {/* Acciones */}
-                <div className="flex flex-col items-center justify-center px-6 gap-3 bg-white/60 backdrop-blur-xl">
+                {/* Derecha: acciones */}
+                <div className="flex flex-col items-center justify-center px-6 gap-2 bg-white/70 backdrop-blur-xl">
+                  <button
+                    className="text-emerald-700 hover:text-emerald-900 font-semibold text-sm px-3 py-2 rounded-xl bg-emerald-100 hover:bg-emerald-200 transition"
+                    onClick={() => openDetalleCliente(c)}
+                    title="Ver detalle del cliente"
+                  >
+                    Ver detalle
+                  </button>
+                  <div className="h-3" />
                   <AdminActions
                     onEdit={() => openModal(c)}
                     onDelete={() => handleDelete(c.id)}
@@ -472,71 +434,160 @@ export default function ClientesGet() {
           )}
         </div>
       </div>
-      {/* Tarjetas para mobile */}
+       {/* === Tarjetas para mobile (UX 200%) === */}
       <div className="md:hidden grid grid-cols-1 gap-4 max-w-xl mx-auto mt-8">
         {filtered.length === 0 && (
-          <div className="text-center text-emerald-200 py-12">
+          <div className="text-center text-emerald-200 py-10 rounded-2xl bg-white/5 shadow-lg">
             No hay clientes para mostrar.
           </div>
         )}
-        {filtered.map((c) => (
+
+        {filtered.map((c, idx) => (
           <motion.div
             key={c.id}
-            className="bg-emerald-800/90 rounded-xl p-5 shadow-xl flex flex-col gap-2"
-            initial={{ opacity: 0, scale: 0.97 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3 }}
+            className="rounded-2xl p-4 shadow-xl bg-gradient-to-br from-[#14221b] via-[#0f1b16] to-[#0c1713] border border-emerald-900/30"
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.18, delay: idx * 0.03 }}
           >
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-bold text-emerald-100">{c.nombre}</h3>
-              <AdminActions
-                onEdit={() => openModal(c)}
-                onDelete={() => handleDelete(c.id)}
-              />
+            {/* Header: avatar + nombre + acciones admin */}
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-100 flex items-center justify-center font-extrabold ring-1 ring-emerald-400/30 shadow-inner">
+                  {initials(c.nombre)}
+                </div>
+                <div className="leading-tight">
+                  <div className="text-emerald-100 font-extrabold text-base">
+                    {safe(c.nombre)}
+                  </div>
+                  <div className="text-emerald-300/80 text-xs">
+                    DNI: {safe(c.dni)}
+                  </div>
+                </div>
+              </div>
+
+              <div className="-mr-1">
+                <AdminActions
+                  onEdit={() => openModal(c)}
+                  onDelete={() => handleDelete(c.id)}
+                />
+              </div>
+            </div>
+
+            {/* Datos principales */}
+            <div className="mt-3 space-y-2 text-sm">
+              {/* Email */}
+              <div className="text-emerald-200/90">
+                {c.email ? (
+                  <a
+                    href={`mailto:${c.email}`}
+                    className="underline decoration-dotted underline-offset-4 hover:text-emerald-300"
+                  >
+                    {c.email}
+                  </a>
+                ) : (
+                  <span className="italic text-emerald-200/60">Sin email</span>
+                )}
+              </div>
+
+              {/* Teléfono */}
+              <div className="text-emerald-200/90">
+                Tel:{' '}
+                {c.telefono ? (
+                  <a
+                    href={`tel:${c.telefono}`}
+                    className="font-semibold hover:text-emerald-300"
+                  >
+                    {displayPhone(c.telefono)}
+                  </a>
+                ) : (
+                  <span className="italic text-emerald-200/60">
+                    Sin teléfono
+                  </span>
+                )}
+              </div>
+
+              {/* Dirección */}
+              <div className="text-emerald-200/90">
+                {c.direccion ? (
+                  <a
+                    href={mapsLink(c.direccion)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block leading-snug hover:text-emerald-300"
+                    title="Ver en Google Maps"
+                  >
+                    {c.direccion}
+                  </a>
+                ) : (
+                  <span className="italic text-emerald-200/60">
+                    Sin dirección
+                  </span>
+                )}
+              </div>
+
+              {/* Última compra */}
+              <div className="text-xs text-emerald-400/90 mt-1">
+                Última compra:{' '}
+                {c.fecha_ultima_compra ? (
+                  formatearFechaARG(c.fecha_ultima_compra)
+                ) : (
+                  <span className="italic text-emerald-200/60">Nunca</span>
+                )}
+              </div>
+            </div>
+
+            {/* Quick actions */}
+            <div className="mt-4 grid grid-cols-4 gap-2">
               <button
-                className="text-emerald-400 mt-4 text-xs font-semibold hover:text-emerald-300 transition"
+                type="button"
+                onClick={() =>
+                  c.telefono && (window.location.href = `tel:${c.telefono}`)
+                }
+                className="px-2 py-2 rounded-xl bg-white/10 text-emerald-200 hover:bg-white/15 active:scale-[0.98] text-xs font-semibold"
+              >
+                Llamar
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  c.telefono &&
+                  window.open(
+                    `https://wa.me/${toWhatsAppNumber(c.telefono)}`,
+                    '_blank'
+                  )
+                }
+                className="px-2 py-2 rounded-xl bg-white/10 text-emerald-200 hover:bg-white/15 active:scale-[0.98] text-xs font-semibold"
+              >
+                WhatsApp
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  c.email && (window.location.href = `mailto:${c.email}`)
+                }
+                className="px-2 py-2 rounded-xl bg-white/10 text-emerald-200 hover:bg-white/15 active:scale-[0.98] text-xs font-semibold"
+              >
+                Email
+              </button>
+              <button
+                type="button"
+                onClick={() => c.dni && copyToClipboard(c.dni)}
+                className="px-2 py-2 rounded-xl bg-white/10 text-emerald-200 hover:bg-white/15 active:scale-[0.98] text-xs font-semibold"
+              >
+                Copiar DNI
+              </button>
+            </div>
+
+            {/* Footer: CTA detalle */}
+            <div className="mt-4">
+              <button
+                className="w-full text-center bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow shadow-emerald-900/20 transition"
                 onClick={() => openDetalleCliente(c)}
                 title="Ver detalle del cliente"
               >
                 Ver detalle
               </button>
-            </div>
-            <div className="text-sm text-emerald-200/90">
-              {c.email || 'Sin Email Agregado'}
-            </div>
-
-            <div className="text-sm text-emerald-200/90">
-              {c.dni || 'Sin DNI Agregado'}
-            </div>
-
-            <div className="text-sm text-emerald-200/90">
-              {c.direccion || 'Sin Dirección Agregada'}
-            </div>
-            <div className="text-sm text-emerald-300">
-              Tel:{' '}
-              {c.telefono ? (
-                <a
-                  href={`https://wa.me/${formatWhatsappNumber(c.telefono)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 font-semibold underline hover:text-emerald-400 transition cursor-pointer"
-                  title="Enviar WhatsApp"
-                >
-                  {formatDisplayPhone(c.telefono)}
-                  <FaWhatsapp className="ml-1 text-green-500" />
-                </a>
-              ) : (
-                '-'
-              )}
-            </div>
-
-            <div className="text-xs text-emerald-400 mt-1">
-              Última compra:{' '}
-              {c.fecha_ultima_compra ? (
-                new Date(c.fecha_ultima_compra).toLocaleDateString()
-              ) : (
-                <span className="italic text-emerald-200/60">Nunca</span>
-              )}
             </div>
           </motion.div>
         ))}
@@ -620,7 +671,6 @@ export default function ClientesGet() {
           </Modal>
         )}
       </AnimatePresence>
-      ;
       <AnimatePresence>
         {detalleCliente && (
           <motion.div
