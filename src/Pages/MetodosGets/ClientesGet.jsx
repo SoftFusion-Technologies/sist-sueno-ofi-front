@@ -32,7 +32,7 @@ import {
 } from '../../utils/utils.js';
 import ParticlesBackground from '../../Components/ParticlesBackground.jsx';
 import formatearFechaARG from '../../Components/formatearFechaARG';
-
+import { useAuth } from '../../AuthContext.jsx';
 Modal.setAppElement('#root');
 
 // --- Función para formatear teléfono:
@@ -127,7 +127,9 @@ function TelCell({ telefono }) {
     </div>
   );
 }
+
 export default function ClientesGet() {
+  const { userId } = useAuth();
   const [clientes, setClientes] = useState([]);
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
@@ -186,41 +188,50 @@ export default function ClientesGet() {
     e.preventDefault();
     try {
       if (editId) {
-        await axios.put(`http://localhost:8080/clientes/${editId}`, formData);
+        // 👇 Enviar usuario_log_id también en UPDATE
+        await axios.put(`http://localhost:8080/clientes/${editId}`, {
+          ...formData,
+          usuario_log_id: userId
+        });
         setModalFeedbackMsg('Cliente actualizado correctamente');
         setModalFeedbackType('success');
       } else {
-        await axios.post('http://localhost:8080/clientes', formData);
+        // 👇 Enviar usuario_log_id también en CREATE
+        await axios.post('http://localhost:8080/clientes', {
+          ...formData,
+          usuario_log_id: userId
+        });
         setModalFeedbackMsg('Cliente creado correctamente');
         setModalFeedbackType('success');
       }
       fetchClientes();
       setModalOpen(false);
-      setModalFeedbackOpen(true); // <--- Abrir modal aquí
+      setModalFeedbackOpen(true);
     } catch (err) {
-      setModalFeedbackMsg('Error al guardar cliente');
+      setModalFeedbackMsg(
+        err.response?.data?.mensajeError || 'Error al guardar cliente'
+      );
       setModalFeedbackType('error');
-      setModalFeedbackOpen(true); // <--- Abrir modal aquí también
+      setModalFeedbackOpen(true);
       console.error(err);
     }
   };
 
   const handleDelete = async (id) => {
-    // Aquí deberías abrir un modal de confirmación en vez de usar window.confirm
-    // Ejemplo: setConfirmDeleteId(id); setConfirmModalOpen(true);
-
-    // Para simplificar (pero aún con alert):
     if (!window.confirm('¿Eliminar este cliente?')) return;
 
     try {
-      await axios.delete(`http://localhost:8080/clientes/${id}`);
+      // 👇 En axios.delete el body va en la clave "data" del config
+      await axios.delete(`http://localhost:8080/clientes/${id}`, {
+        data: { usuario_log_id: userId }
+      });
+
       fetchClientes();
       setModalFeedbackMsg('Cliente eliminado correctamente');
       setModalFeedbackType('success');
     } catch (err) {
       const mensaje =
         err.response?.data?.mensajeError || 'Error al eliminar cliente';
-
       setModalFeedbackMsg(mensaje);
       setModalFeedbackType('error');
     }
@@ -448,7 +459,7 @@ export default function ClientesGet() {
                 >
                   Ver detalle
                 </button>
-              
+
                 {/* Acciones */}
                 <div className="flex flex-col items-center justify-center px-6 gap-3 bg-white/60 backdrop-blur-xl">
                   <AdminActions
