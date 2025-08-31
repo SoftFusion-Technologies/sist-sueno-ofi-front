@@ -34,7 +34,9 @@ const LogsSistema = () => {
     'aplicar-descuento',
     'ajuste de precios',
     'cerrar',
-    'actualizar'
+    'actualizar',
+    'cambiar_estado',
+    'predeterminada'
   ];
 
   const modulos = [
@@ -45,7 +47,8 @@ const LogsSistema = () => {
     'productos',
     'locales',
     'stock',
-    'combos'
+    'combos',
+    'proveedores'
   ];
 
   const [paginaActual, setPaginaActual] = useState(1);

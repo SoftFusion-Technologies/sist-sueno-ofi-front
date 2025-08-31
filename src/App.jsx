@@ -66,6 +66,7 @@ import ComboEditarPermitidos from './Pages/Stock/Combos/ComboEditarPermitidos';
 import Home from './Pages/Home';
 import LogsSistema from './Pages/MetodosGets/LogsSistema';
 import PedidosStockPanel from './Pages/Stock/PedidosStockPanel';
+import ProveedoresManager from './Pages/Proveedores/ProveedoresManager';
 
 function AppContent() {
   const { hideLayoutFooter, hideLayoutNav } = useLayoutVisibility();
@@ -397,6 +398,17 @@ function AppContent() {
             }
           />
           {/* MODULO DENTRO DE VENDEDORES FINAL BENJAMIN ORELLANA 01 08 25 */}
+          {/* MODULO DENTRO DE PROVEEDORES INICIO BENJAMIN ORELLANA 30 08 25 */}
+          <Ruta
+            path="/dashboard/proveedores/proveedores"
+            element={
+              <ProtectedRoute>
+                {' '}
+                <ProveedoresManager />{' '}
+              </ProtectedRoute>
+            }
+          />{' '}
+          {/* MODULO DENTRO DE PROVEEDORES FINAL BENJAMIN ORELLANA 30 08 25 */}
           {/* componentes del staff y login FINAL */}
           {/* <Ruta path="/*" element={<NotFound />} /> */}
           {/* 🔁 Ruta no encontrada */}

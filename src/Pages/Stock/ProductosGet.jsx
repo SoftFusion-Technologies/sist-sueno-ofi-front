@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import Modal from 'react-modal';
 import {
@@ -20,6 +20,7 @@ import { useAuth } from '../../AuthContext.jsx';
 import { getUserId } from '../../utils/authUtils';
 
 Modal.setAppElement('#root');
+const BASE_URL = 'http://localhost:8080';
 
 const ProductosGet = () => {
   const { userLevel } = useAuth();
@@ -57,6 +58,22 @@ const ProductosGet = () => {
 
   const [showAjustePrecios, setShowAjustePrecios] = useState(false);
 
+  const [proveedores, setProveedores] = useState([]);
+  const [proveedorIdSel, setProveedorIdSel] = useState(''); // '' = NULL
+  useEffect(() => {
+    // Cargar proveedores activos (podés ajustar al endpoint que uses)
+    fetch(`${BASE_URL}/proveedores`)
+      .then((r) => r.json())
+      .then((json) => {
+        const arr = Array.isArray(json?.data)
+          ? json.data
+          : Array.isArray(json)
+          ? json
+          : [];
+        setProveedores(arr.filter((p) => p.estado === 'activo'));
+      })
+      .catch(() => setProveedores([]));
+  }, []);
   // RELACION AL FILTRADO BENJAMIN ORELLANA 23-04-25
 
   const fetchData = async () => {
@@ -127,6 +144,13 @@ const ProductosGet = () => {
         imagen_url: producto.imagen_url || '',
         estado: producto.estado || 'activo'
       });
+
+      // 👇 si viene el preferido en el producto, lo mostramos en el select
+      setProveedorIdSel(
+        producto.proveedor_preferido_id ||
+          producto.proveedor_preferido?.id ||
+          ''
+      );
     } else {
       setEditId(null);
       setFormValues({
@@ -142,6 +166,7 @@ const ProductosGet = () => {
         imagen_url: '',
         estado: 'activo'
       });
+      setProveedorIdSel(''); // nuevo => sin preferido por defecto
     }
     setModalOpen(true);
   };
@@ -155,26 +180,78 @@ const ProductosGet = () => {
       return;
     }
 
+    const uid = getUserId?.() ?? null;
+
     try {
       const dataToSend = {
         ...formValues,
         precio: parsedPrecio.toFixed(2),
-        usuario_log_id: getUserId() // ⬅️ nombre correcto
+        usuario_log_id: uid,
+        // 👇 NUEVO: mandamos el preferido (nullable)
+        proveedor_preferido_id: proveedorIdSel ? Number(proveedorIdSel) : null
       };
 
       if (editId) {
-        await axios.put(
-          `http://localhost:8080/productos/${editId}`,
-          dataToSend
-        );
+        await axios.put(`${BASE_URL}/productos/${editId}`, dataToSend, {
+          headers: { 'X-User-Id': String(uid ?? '') }
+        });
       } else {
-        await axios.post('http://localhost:8080/productos', dataToSend);
+        const resp = await axios.post(`${BASE_URL}/productos`, dataToSend, {
+          headers: { 'X-User-Id': String(uid ?? '') }
+        });
+
+        const nuevoProducto = resp?.data?.producto;
+        if (!nuevoProducto?.id)
+          throw new Error('No se recibió el ID del producto creado');
+
+        // Si el usuario eligió un proveedor, creamos la relación producto↔proveedor
+        if (proveedorIdSel) {
+          const payloadPP = {
+            producto_id: Number(nuevoProducto.id),
+            proveedor_id: Number(proveedorIdSel),
+
+            // 🔹 Prellenado "mejor"
+            sku_proveedor: formValues.codigo_sku || null,
+            nombre_en_proveedor: formValues.nombre || null,
+
+            // costos/condiciones iniciales (ajustá estos defaults si querés)
+            costo_neto: 0, // costo de compra (lo completarán luego)
+            moneda: 'ARS',
+            alicuota_iva: 21,
+            inc_iva: false,
+            descuento_porcentaje: 0,
+            plazo_entrega_dias: 7,
+            minimo_compra: 1,
+
+            vigente: true,
+            observaciones: 'Alta automática al crear producto',
+            usuario_log_id: uid
+          };
+
+          try {
+            const rPP = await axios.post(
+              `${BASE_URL}/producto-proveedor`,
+              payloadPP,
+              {
+                headers: { 'X-User-Id': String(uid ?? '') }
+              }
+            );
+            // opcional: abrir modal para que completen detalles (ver B)
+            const creado = rPP?.data?.data || rPP?.data?.pp || rPP?.data; // según tu respuesta
+            // openPPAutoEdit(creado?.id, Number(proveedorIdSel), nuevoProducto.id);
+          } catch (e) {
+            console.warn('[producto-proveedor] no crítico:', e?.message || e);
+          }
+        }
       }
 
-      fetchData();
+      fetchData?.();
       setModalOpen(false);
     } catch (err) {
       console.error('Error al guardar producto:', err);
+      alert(
+        err?.response?.data?.mensajeError || err.message || 'Error al guardar'
+      );
     }
   };
 
@@ -227,6 +304,12 @@ const ProductosGet = () => {
     const nombreArchivo = `productos-exportados-${timestamp}.xlsx`;
     XLSX.writeFile(workbook, nombreArchivo);
   };
+
+  const proveedoresMap = useMemo(() => {
+    const m = Object.create(null);
+    for (const pr of proveedores) m[pr.id] = pr.razon_social;
+    return m;
+  }, [proveedores]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 py-10 px-6 text-white relative">
@@ -373,6 +456,28 @@ const ProductosGet = () => {
                 {p.categoria?.nombre || 'Sin categoría'}
               </p>
 
+              {/* Proveedor preferido */}
+              {(() => {
+                const provName =
+                  p.proveedor_preferido?.razon_social ?? // si el backend incluye el objeto
+                  (p.proveedor_preferido_id
+                    ? proveedoresMap[p.proveedor_preferido_id]
+                    : null); // si solo viene el id
+
+                return (
+                  <p className="text-sm text-gray-200 mb-1">
+                    <span className="font-semibold text-white">Proveedor:</span>{' '}
+                    {provName ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white/10 text-emerald-300 border border-emerald-900/40">
+                        {provName}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
+                  </p>
+                );
+              })()}
+
               <div className="flex items-center gap-3 mt-2">
                 {/* Precio original */}
                 <span
@@ -456,6 +561,25 @@ const ProductosGet = () => {
               className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-rose-400"
               required
             />
+
+            {/* PROVEEDOR PREFERIDO (opcional) */}
+            <label className="block">
+              <span className="text-sm text-gray-700">
+                Proveedor (opcional)
+              </span>
+              <select
+                value={proveedorIdSel}
+                onChange={(e) => setProveedorIdSel(e.target.value)}
+                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-rose-400 bg-white"
+              >
+                <option value="">Sin proveedor</option>
+                {proveedores.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.razon_social}
+                  </option>
+                ))}
+              </select>
+            </label>
 
             {/* DESCRIPCIÓN */}
             <textarea
@@ -582,6 +706,12 @@ const ProductosGet = () => {
             </select>
 
             <div className="text-right">
+              <button
+                onClick={() => setModalOpen(false)}
+                className="mr-2 bg-gray-500 hover:bg-gray-600 transition px-6 py-2 text-white font-medium rounded-lg"
+              >
+                Cerrar
+              </button>
               <button
                 type="submit"
                 className="bg-rose-500 hover:bg-rose-600 transition px-6 py-2 text-white font-medium rounded-lg"
