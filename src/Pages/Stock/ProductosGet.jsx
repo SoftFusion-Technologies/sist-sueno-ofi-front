@@ -721,6 +721,7 @@ const ProductosGet = () => {
             </div>
           </form>
         </Modal>
+
         <Modal
           isOpen={!!confirmDelete}
           onRequestClose={() => {
@@ -746,6 +747,7 @@ const ProductosGet = () => {
               Cerrar
             </button>
 
+            {/* Caso: tiene stock -> ofrecer acción destructiva doble */}
             {deleteMeta?.reason === 'HAS_STOCK' && (
               <button
                 onClick={async () => {
@@ -768,14 +770,53 @@ const ProductosGet = () => {
                     console.error('Error al eliminar con forzado:', error);
                   }
                 }}
-                className="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white"
+                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white"
               >
                 Eliminar stock y producto
               </button>
             )}
 
-            {/* Si es FK_COMBO, NO ofrecer acción destructiva */}
+            {/* Caso: asociado a proveedor -> permitir continuar igualmente */}
+            {deleteMeta?.reason === 'HAS_PROVEEDOR' && (
+              <button
+                onClick={async () => {
+                  try {
+                    const userId = getUserId();
+                    await axios.delete(
+                      `http://localhost:8080/productos/${confirmDelete}`,
+                      { data: { usuario_log_id: userId, forzado: true } } // <- clave
+                    );
+                    setConfirmDelete(null);
+                    setDeleteMeta(null);
+                    fetchData();
+                  } catch (error) {
+                    console.error(
+                      'Error al eliminar producto (forzado por proveedor):',
+                      error
+                    );
+                  }
+                }}
+                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white"
+              >
+                Eliminar de todas formas
+              </button>
+            )}
+
+            {/* Caso: combos -> solo informar */}
             {deleteMeta?.reason === 'FK_COMBO' && (
+              <button
+                onClick={() => {
+                  setConfirmDelete(null);
+                  setDeleteMeta(null);
+                }}
+                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white"
+              >
+                Entendido
+              </button>
+            )}
+
+            {/* Caso: pedidos de stock -> solo informar */}
+            {deleteMeta?.reason === 'FK_PEDIDOS' && (
               <button
                 onClick={() => {
                   setConfirmDelete(null);
