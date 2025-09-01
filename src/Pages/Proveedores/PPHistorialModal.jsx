@@ -96,7 +96,6 @@ export default function PPHistorialModal({
   proveedorNombre,
   userId
 }) {
-
   // estado general
   const [loadingPP, setLoadingPP] = useState(false);
   const [error, setError] = useState('');
@@ -373,7 +372,7 @@ export default function PPHistorialModal({
                         className="pr-10"
                       >
                         {!ppOpts.length && (
-                          <option value="">— Sin vínculos —</option>
+                          <option value=""> Sin vínculos </option>
                         )}
                         {ppOpts.map((o) => (
                           <option key={o.id} value={o.id}>
