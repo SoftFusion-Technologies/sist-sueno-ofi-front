@@ -707,7 +707,7 @@ export default function ProveedoresManager() {
               {/* Header sticky */}
               <div className="sticky top-0 z-10 bg-white border-b px-4 md:px-6 py-3 flex items-center justify-between">
                 <h2 className="text-lg md:text-2xl font-bold text-gray-800">
-                  {editId ? 'Editar proveedor' : 'Nuevo proveedor'}
+                  {editId ? 'Editar proveedor' : 'Nuevo Proveedor'}
                 </h2>
                 <button
                   aria-label="Cerrar"
