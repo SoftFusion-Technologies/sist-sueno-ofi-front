@@ -18,6 +18,7 @@ import AdminActions from '../../Components/AdminActions';
 import AjustePreciosModal from './Components/AjustePreciosModal.jsx';
 import { useAuth } from '../../AuthContext.jsx';
 import { getUserId } from '../../utils/authUtils';
+import ProductoSetupWizard from './Components/ProductoSetupWizard.jsx';
 
 Modal.setAppElement('#root');
 const BASE_URL = 'http://localhost:8080';
@@ -55,6 +56,7 @@ const ProductosGet = () => {
   const [precioMax, setPrecioMax] = useState('');
   const [ordenCampo, setOrdenCampo] = useState('nombre');
   const [categoriaFiltro, setCategoriaFiltro] = useState(null);
+  // RELACION AL FILTRADO BENJAMIN ORELLANA 23-04-25
 
   const [showAjustePrecios, setShowAjustePrecios] = useState(false);
 
@@ -74,7 +76,13 @@ const ProductosGet = () => {
       })
       .catch(() => setProveedores([]));
   }, []);
-  // RELACION AL FILTRADO BENJAMIN ORELLANA 23-04-25
+
+  const [setupOpen, setSetupOpen] = useState(false);
+  const [setupData, setSetupData] = useState({
+    producto: null,
+    proveedor: null,
+    ppId: null
+  });
 
   const fetchData = async () => {
     try {
@@ -187,7 +195,6 @@ const ProductosGet = () => {
         ...formValues,
         precio: parsedPrecio.toFixed(2),
         usuario_log_id: uid,
-        // 👇 NUEVO: mandamos el preferido (nullable)
         proveedor_preferido_id: proveedorIdSel ? Number(proveedorIdSel) : null
       };
 
@@ -195,58 +202,76 @@ const ProductosGet = () => {
         await axios.put(`${BASE_URL}/productos/${editId}`, dataToSend, {
           headers: { 'X-User-Id': String(uid ?? '') }
         });
-      } else {
-        const resp = await axios.post(`${BASE_URL}/productos`, dataToSend, {
-          headers: { 'X-User-Id': String(uid ?? '') }
-        });
-
-        const nuevoProducto = resp?.data?.producto;
-        if (!nuevoProducto?.id)
-          throw new Error('No se recibió el ID del producto creado');
-
-        // Si el usuario eligió un proveedor, creamos la relación producto↔proveedor
-        if (proveedorIdSel) {
-          const payloadPP = {
-            producto_id: Number(nuevoProducto.id),
-            proveedor_id: Number(proveedorIdSel),
-
-            // 🔹 Prellenado "mejor"
-            sku_proveedor: formValues.codigo_sku || null,
-            nombre_en_proveedor: formValues.nombre || null,
-
-            // costos/condiciones iniciales (ajustá estos defaults si querés)
-            costo_neto: 0, // costo de compra (lo completarán luego)
-            moneda: 'ARS',
-            alicuota_iva: 21,
-            inc_iva: false,
-            descuento_porcentaje: 0,
-            plazo_entrega_dias: 7,
-            minimo_compra: 1,
-
-            vigente: true,
-            observaciones: 'Alta automática al crear producto',
-            usuario_log_id: uid
-          };
-
-          try {
-            const rPP = await axios.post(
-              `${BASE_URL}/producto-proveedor`,
-              payloadPP,
-              {
-                headers: { 'X-User-Id': String(uid ?? '') }
-              }
-            );
-            // opcional: abrir modal para que completen detalles (ver B)
-            const creado = rPP?.data?.data || rPP?.data?.pp || rPP?.data; // según tu respuesta
-            // openPPAutoEdit(creado?.id, Number(proveedorIdSel), nuevoProducto.id);
-          } catch (e) {
-            console.warn('[producto-proveedor] no crítico:', e?.message || e);
-          }
-        }
+        fetchData?.();
+        setModalOpen(false);
+        return; // 👈 no abrimos wizard en editar
       }
 
+      // CREAR PRODUCTO
+      const resp = await axios.post(`${BASE_URL}/productos`, dataToSend, {
+        headers: { 'X-User-Id': String(uid ?? '') }
+      });
+      const nuevoProducto = resp?.data?.producto;
+      if (!nuevoProducto?.id)
+        throw new Error('No se recibió el ID del producto creado');
+
+      // Si NO hay proveedor seleccionado ⇒ listo (no abrimos wizard)
+      if (!proveedorIdSel) {
+        fetchData?.();
+        setModalOpen(false);
+        return;
+      }
+
+      // Si HAY proveedor ⇒ crear relación y abrir wizard
+      const payloadPP = {
+        producto_id: Number(nuevoProducto.id),
+        proveedor_id: Number(proveedorIdSel),
+        sku_proveedor: formValues.codigo_sku || null,
+        nombre_en_proveedor: formValues.nombre || null,
+        costo_neto: 0,
+        moneda: 'ARS',
+        alicuota_iva: 21,
+        inc_iva: false,
+        descuento_porcentaje: 0,
+        plazo_entrega_dias: 7,
+        minimo_compra: 1,
+        vigente: true,
+        observaciones: 'Alta automática al crear producto',
+        usuario_log_id: uid,
+
+        // 👇 NUEVO: pedimos NO crear historial inicial
+        registrar_historial_inicial: false
+        // y SIN "motivo", para no triggerear el default del backend
+      };
+
+      let creadoPpId = null;
+      try {
+        const rPP = await axios.post(
+          `${BASE_URL}/producto-proveedor`,
+          payloadPP,
+          {
+            headers: { 'X-User-Id': String(uid ?? '') }
+          }
+        );
+        const creado = rPP?.data?.pp || rPP?.data?.data || rPP?.data;
+        creadoPpId = creado?.id ?? null;
+      } catch (e) {
+        console.warn('[producto-proveedor] no crítico:', e?.message || e);
+      }
+
+      // cerrar modal de crear y refrescar
       fetchData?.();
       setModalOpen(false);
+
+      // abrir wizard SOLO si tenés proveedor
+      const proveedorObj =
+        proveedores.find((p) => p.id === Number(proveedorIdSel)) || null;
+      setSetupData({
+        producto: nuevoProducto,
+        proveedor: proveedorObj,
+        ppId: creadoPpId
+      });
+      setSetupOpen(true);
     } catch (err) {
       console.error('Error al guardar producto:', err);
       alert(
@@ -834,6 +859,16 @@ const ProductosGet = () => {
         open={showAjustePrecios}
         onClose={() => setShowAjustePrecios(false)}
         onSuccess={() => fetchData()} // refrescar productos
+      />
+      <ProductoSetupWizard
+        open={setupOpen}
+        onClose={() => setSetupOpen(false)}
+        producto={setupData.producto}
+        proveedorInicial={setupData.proveedor}
+        ppInicialId={setupData.ppId}
+        uid={getUserId?.() ?? null}
+        BASE_URL={BASE_URL}
+        onRefresh={fetchData}
       />
     </div>
   );
