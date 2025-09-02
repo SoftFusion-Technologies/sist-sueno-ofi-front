@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../AuthContext';
 import {
@@ -28,6 +28,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import ParticlesBackground from '../../Components/ParticlesBackground';
 import ButtonBack from '../../Components/ButtonBack';
 import { formatearPeso } from '../../utils/formatearPeso';
+import {
+  X,
+  ChevronRight,
+  CheckCircle2,
+  Wand2,
+  CalendarClock,
+  Hash,
+  ClipboardCopy,
+  ExternalLink
+} from 'lucide-react';
 
 import {
   fetchLocales,
@@ -37,6 +47,8 @@ import {
   getNombreUsuario
 } from '../../utils/utils.js';
 // Microcomponente Glass Card
+
+const BASE_URL = 'http://localhost:8080';
 const GlassCard = ({ children, className = '' }) => (
   <div
     className={`rounded-2xl p-6 shadow-2xl bg-white/10 backdrop-blur-2xl border border-white/10 ${className}`}
@@ -44,6 +56,23 @@ const GlassCard = ({ children, className = '' }) => (
     {children}
   </div>
 );
+
+const fmtNum = (n) =>
+  new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2 }).format(
+    Math.abs(Number(n) || 0)
+  );
+const fmtARS = (n) =>
+  new Intl.NumberFormat('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+    minimumFractionDigits: 2
+  }).format(Number(n) || 0);
+const horaCorta = (iso) =>
+  new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+const fechaCorta = (iso) => new Date(iso).toLocaleDateString();
+const esVenta = (m) => m.descripcion?.toLowerCase().includes('venta #');
+
+const copiar = (txt) => navigator.clipboard.writeText(String(txt ?? ''));
 
 export default function CajaPOS() {
   const { userId, userLocalId } = useAuth();
@@ -59,6 +88,55 @@ export default function CajaPOS() {
   });
   const [historial, setHistorial] = useState([]);
   const [showHistorial, setShowHistorial] = useState(false);
+
+  const [movSel, setMovSel] = useState(null);
+  const [openDetalle, setOpenDetalle] = useState(false);
+
+  // estados opcionales para modal/lista
+  const [openMovsCaja, setOpenMovsCaja] = useState(false);
+  const [movsCaja, setMovsCaja] = useState([]);
+  const [loadingMovs, setLoadingMovs] = useState(false);
+  const [errorMovs, setErrorMovs] = useState('');
+
+  // filtros opcionales (si querés)
+  const [fDesde, setFDesde] = useState('');
+  const [fHasta, setFHasta] = useState('');
+  const [fTipo, setFTipo] = useState(''); // '', 'ingreso', 'egreso', 'venta'
+  const [fQuery, setFQuery] = useState('');
+
+  async function verMovimientosDeCaja(cajaId) {
+    if (!cajaId) return;
+    setOpenMovsCaja(true);
+    setLoadingMovs(true);
+    setErrorMovs('');
+    try {
+      // si tu backend ya soporta filtros, los mandamos como query params:
+      const params = new URLSearchParams();
+      if (fDesde) params.append('desde', fDesde); // YYYY-MM-DD
+      if (fHasta) params.append('hasta', fHasta); // YYYY-MM-DD
+      if (fTipo) params.append('tipo', fTipo); // ingreso|egreso|venta
+      if (fQuery) params.append('q', fQuery); // texto
+
+      const url = params.toString()
+        ? `${BASE_URL}/movimientosv2/caja/${cajaId}?${params.toString()}`
+        : `${BASE_URL}/movimientosv2/caja/${cajaId}`;
+
+      const res = await axios.get(url, {
+        headers: { 'X-User-Id': String(userId ?? '') }
+      });
+
+      setMovsCaja(Array.isArray(res.data) ? res.data : res.data?.data ?? []);
+    } catch (e) {
+      setErrorMovs(
+        e?.response?.data?.mensajeError ||
+          e.message ||
+          'Error al traer movimientos'
+      );
+      setMovsCaja([]);
+    } finally {
+      setLoadingMovs(false);
+    }
+  }
 
   useEffect(() => {
     const fetchCaja = async () => {
@@ -217,6 +295,31 @@ export default function CajaPOS() {
     ? getInfoLocal(detalleCaja.local_id, locales)
     : { nombre: '-', direccion: '-' };
 
+  // Estado de filtros (ponelo en tu componente)
+  const [queryMovs, setQueryMovs] = useState('');
+  const [tipoMov, setTipoMov] = useState('todos'); // 'todos' | 'ingreso' | 'egreso' | 'venta'
+
+  // Orden + filtros (memo)
+  const movimientosOrdenados = useMemo(
+    () =>
+      [...movimientos].sort((a, b) => new Date(b.fecha) - new Date(a.fecha)),
+    [movimientos]
+  );
+  const movimientosFiltrados = useMemo(() => {
+    let arr = movimientosOrdenados;
+    if (tipoMov === 'ingreso') arr = arr.filter((m) => m.tipo === 'ingreso');
+    if (tipoMov === 'egreso') arr = arr.filter((m) => m.tipo === 'egreso');
+    if (tipoMov === 'venta') arr = arr.filter((m) => esVenta(m));
+    if (queryMovs.trim()) {
+      const q = queryMovs.trim().toLowerCase();
+      arr = arr.filter(
+        (m) =>
+          m.descripcion?.toLowerCase().includes(q) ||
+          String(m.monto).includes(q)
+      );
+    }
+    return arr;
+  }, [movimientosOrdenados, tipoMov, queryMovs]);
   // RESPONSIVE & GLASS
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-[#101016] via-[#181A23] to-[#11192b] px-2 py-8">
@@ -282,91 +385,251 @@ export default function CajaPOS() {
                   </span>
                 </div>
               </div>
-              <h2 className="mt-8 text-xl font-semibold mb-2 text-white">
-                Movimientos
-              </h2>
-              <div className="max-h-56 overflow-y-auto mb-2 rounded-xl bg-gradient-to-br from-[#192023] to-[#232631] p-2 custom-scrollbar shadow-inner">
-                {movimientos.length === 0 ? (
-                  <p className="text-gray-400 text-center">Sin movimientos…</p>
-                ) : (
-                  // Ordena de más reciente a más antiguo
-                  movimientos
-                    .slice()
-                    .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
-                    .map((m) => {
-                      // Determina color y estilo por tipo y si es venta
-                      let bg, border, icon;
-                      if (m.descripcion?.toLowerCase().includes('venta #')) {
-                        bg =
-                          'bg-gradient-to-r from-emerald-900/80 to-emerald-800/60';
-                        border = 'border-l-4 border-emerald-400';
-                        icon = (
-                          <FaCashRegister className="text-emerald-400 mr-2" />
-                        );
-                      } else if (m.tipo === 'egreso') {
-                        bg = 'bg-gradient-to-r from-red-900/70 to-red-700/40';
-                        border = 'border-l-4 border-red-500';
-                        icon = <FaMinus className="text-red-400 mr-2" />;
-                      } else {
-                        bg =
-                          'bg-gradient-to-r from-green-900/70 to-green-800/30';
-                        border = 'border-l-4 border-green-400';
-                        icon = <FaPlus className="text-green-300 mr-2" />;
-                      }
+
+              <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#1a1f25] to-[#222832] p-3 shadow-xl">
+                {/* Título */}
+                <h2 className="text-white text-lg font-semibold mb-2">
+                  Movimientos
+                </h2>
+
+                {/* Toolbar: filtros arriba, buscador DEBAJO */}
+                <div className="flex flex-col gap-2 mb-3">
+                  {/* Filtros (scroll horizontal en mobile) */}
+                  <div className="overflow-x-auto no-scrollbar -mx-1">
+                    <div className="inline-flex min-w-max rounded-lg overflow-hidden border border-white/10 bg-black/20">
+                      {[
+                        { key: 'todos', label: 'Todos' },
+                        { key: 'ingreso', label: 'Ingresos' },
+                        { key: 'egreso', label: 'Egresos' },
+                        { key: 'venta', label: 'Ventas' }
+                      ].map(({ key, label }) => (
+                        <button
+                          key={key}
+                          onClick={() => setTipoMov(key)}
+                          className={`px-3 py-2 text-xs sm:text-[13px] font-semibold transition whitespace-nowrap
+              ${
+                tipoMov === key
+                  ? 'bg-white/10 text-white'
+                  : 'text-gray-300 hover:bg-white/5'
+              }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Buscador siempre debajo y alineado a la izquierda */}
+                  <div className="relative w-full md:max-w-md">
+                    <input
+                      value={queryMovs}
+                      onChange={(e) => setQueryMovs(e.target.value)}
+                      placeholder="Buscar…"
+                      className="w-full pl-9 pr-3 py-2 rounded-lg bg-black/30 border border-white/10 text-sm text-gray-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                    />
+                    <svg
+                      className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M12.9 14.32a8 8 0 111.414-1.414l3.387 3.387a1 1 0 01-1.414 1.414l-3.387-3.387zM14 8a6 6 0 11-12 0 6 6 0 0112 0z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Lista */}
+                <div className="max-h-72 overflow-y-auto rounded-xl bg-black/10 p-2 custom-scrollbar">
+                  {movimientosFiltrados.length === 0 ? (
+                    <p className="text-gray-400 text-center py-6">
+                      Sin movimientos…
+                    </p>
+                  ) : (
+                    movimientosFiltrados.map((m) => {
+                      const venta = esVenta(m);
+                      const egreso = m.tipo === 'egreso';
+                      const ingreso = m.tipo === 'ingreso';
+                      const Icono = venta
+                        ? FaCashRegister
+                        : ingreso
+                        ? FaPlus
+                        : FaMinus;
+
+                      const rowTheme = venta
+                        ? 'from-emerald-950/60 to-emerald-900/40 hover:from-emerald-900/60 hover:to-emerald-800/50'
+                        : egreso
+                        ? 'from-red-950/60 to-red-900/40 hover:from-red-900/60 hover:to-red-800/50'
+                        : 'from-green-950/60 to-green-900/40 hover:from-green-900/60 hover:to-green-800/50';
+
+                      const amountColor = ingreso
+                        ? 'text-emerald-300'
+                        : 'text-red-300';
+                      const sign = ingreso ? '+' : '-';
+
                       return (
                         <motion.div
                           key={m.id}
-                          className={`grid grid-cols-[minmax(120px,2fr)_minmax(95px,1fr)_minmax(78px,auto)_auto] items-center gap-2 py-2 px-3 mb-2 rounded-xl text-base shadow-sm transition-all ${bg} ${border}`}
-                          initial={{ opacity: 0, x: 50 }}
+                          onClick={() => {
+                            setMovSel(m);
+                            setOpenDetalle(true);
+                          }}
+                          className={`rounded-xl  outline-1 outline-white/5 bg-gradient-to-r ${rowTheme} p-3 mb-2 transition cursor-pointer`}
+                          initial={{ opacity: 0, x: 30 }}
                           animate={{ opacity: 1, x: 0 }}
                           exit={{ opacity: 0 }}
-                          transition={{ duration: 0.17 }}
+                          transition={{ duration: 0.18 }}
                         >
-                          {/* Icono y descripción */}
-                          <div className="flex items-center truncate font-semibold">
-                            {icon}
-                            <span className="truncate">{m.descripcion}</span>
-                          </div>
-                          {/* Monto */}
-                          <span
-                            className={
-                              m.tipo === 'ingreso'
-                                ? 'text-green-300 font-semibold text-lg text-right'
-                                : 'text-red-300 font-semibold text-lg text-right'
-                            }
-                          >
-                            {m.tipo === 'ingreso' ? '+' : '-'}$
-                            {Number(m.monto).toLocaleString('es-AR', {
-                              minimumFractionDigits: 2
-                            })}
-                          </span>
-                          {/* Hora */}
-                          <span className="text-xs text-gray-400 text-right">
-                            {new Date(m.fecha).toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </span>
-                          {/* Botón detalle solo para venta */}
-                          {m.tipo === 'ingreso' &&
-                            m.referencia &&
-                            /^\d+$/.test(m.referencia) && (
-                              <button
-                                className="text-emerald-300 underline text-xs font-semibold hover:text-emerald-200 transition whitespace-nowrap ml-2"
-                                onClick={() =>
-                                  mostrarDetalleVenta(Number(m.referencia))
+                          {/* ===== Mobile layout (2 líneas, descripción visible) ===== */}
+                          <div className="md:hidden">
+                            <div className="flex items-start gap-3">
+                              <Icono
+                                className={
+                                  ingreso
+                                    ? 'text-emerald-300'
+                                    : egreso
+                                    ? 'text-red-300'
+                                    : 'text-emerald-300'
                                 }
-                                title="Ver detalle de venta"
+                              />
+                              <div className="flex-1 min-w-0">
+                                {/* Descripción: 2 líneas */}
+                                <div
+                                  className="text-gray-100 font-semibold whitespace-normal break-words line-clamp-2"
+                                  title={m.descripcion}
+                                >
+                                  {m.descripcion}
+                                </div>
+
+                                {/* Meta: badge + fecha + acción */}
+                                <div className="mt-1 flex items-center gap-2 flex-wrap">
+                                  <span
+                                    className={`text-[10px] px-2 py-0.5 rounded-full border
+                      ${
+                        ingreso
+                          ? 'bg-emerald-400/10 text-emerald-300 border-emerald-400/30'
+                          : egreso
+                          ? 'bg-red-400/10 text-red-300 border-red-400/30'
+                          : 'bg-emerald-400/10 text-emerald-300 border-emerald-400/30'
+                      }`}
+                                  >
+                                    {venta
+                                      ? 'Venta'
+                                      : ingreso
+                                      ? 'Ingreso'
+                                      : 'Egreso'}
+                                  </span>
+                                  <span className="text-[11px] text-gray-300 font-mono tabular-nums">
+                                    {fechaCorta(m.fecha)} · {horaCorta(m.fecha)}
+                                  </span>
+                                  {ingreso &&
+                                    m.referencia &&
+                                    /^\d+$/.test(m.referencia) && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation(); // 👈 evita abrir el modal de movimiento
+                                          mostrarDetalleVenta(
+                                            Number(m.referencia)
+                                          );
+                                        }}
+                                        className="text-emerald-300 text-xs font-semibold underline hover:text-emerald-200"
+                                        title="Ver detalle de venta"
+                                      >
+                                        Ver detalle
+                                      </button>
+                                    )}
+                                </div>
+                              </div>
+
+                              {/* Importe a la derecha */}
+                              <div
+                                className={`shrink-0 text-right font-mono tabular-nums font-semibold ${amountColor}`}
                               >
-                                Ver detalle
-                              </button>
-                            )}
+                                <span className="mr-1">{sign}</span>${' '}
+                                {fmtNum(m.monto)}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* ===== Desktop layout (una línea con columnas fijas) ===== */}
+                          <div className="hidden md:grid grid-cols-[auto_minmax(0,1fr)_auto_auto_auto] items-center gap-3">
+                            <span>
+                              <Icono
+                                className={
+                                  ingreso
+                                    ? 'text-emerald-300'
+                                    : egreso
+                                    ? 'text-red-300'
+                                    : 'text-emerald-300'
+                                }
+                              />
+                            </span>
+
+                            <div className="min-w-0 flex items-center gap-2">
+                              <span
+                                className="truncate text-gray-100 font-semibold"
+                                title={m.descripcion}
+                              >
+                                {m.descripcion}
+                              </span>
+                              <span
+                                className={`text-[10px] px-2 py-0.5 rounded-full border
+                  ${
+                    ingreso
+                      ? 'bg-emerald-400/10 text-emerald-300 border-emerald-400/30'
+                      : egreso
+                      ? 'bg-red-400/10 text-red-300 border-red-400/30'
+                      : 'bg-emerald-400/10 text-emerald-300 border-emerald-400/30'
+                  }`}
+                              >
+                                {venta
+                                  ? 'Venta'
+                                  : ingreso
+                                  ? 'Ingreso'
+                                  : 'Egreso'}
+                              </span>
+                            </div>
+
+                            <div
+                              className={`justify-self-end font-mono tabular-nums font-semibold ${amountColor}`}
+                            >
+                              <span className="mr-1">{sign}</span>${' '}
+                              {fmtNum(m.monto)}
+                            </div>
+
+                            <div className="justify-self-end text-[11px] text-gray-300 font-mono tabular-nums">
+                              {fechaCorta(m.fecha)} · {horaCorta(m.fecha)}
+                            </div>
+
+                            <div className="hidden md:block justify-self-end">
+                              {ingreso &&
+                              m.referencia &&
+                              /^\d+$/.test(m.referencia) ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation(); // 👈 importante
+                                    mostrarDetalleVenta(Number(m.referencia));
+                                  }}
+                                  className="text-emerald-300 text-xs font-semibold underline hover:text-emerald-200"
+                                  title="Ver detalle de venta"
+                                >
+                                  Ver detalle
+                                </button>
+                              ) : (
+                                <span />
+                              )}
+                            </div>
+                          </div>
                         </motion.div>
                       );
                     })
-                )}
+                  )}
+                </div>
               </div>
-
               {/* Registrar movimiento manual */}
               <div className="mt-8">
                 <h3 className="font-bold mb-3 flex gap-2 items-center text-lg text-white">
@@ -483,7 +746,7 @@ export default function CajaPOS() {
                 </button>
                 <div className="flex items-center gap-3 mb-5">
                   <FaHistory className="text-emerald-400 text-lg" />
-                  <h4 className="font-bold text-emerald-400 text-xl tracking-tight">
+                  <h4 className="font-bold uppercase titulo text-emerald-400 text-xl tracking-tight">
                     Historial de cajas cerradas
                   </h4>
                 </div>
@@ -916,6 +1179,30 @@ export default function CajaPOS() {
                 </div>
               </div>
 
+              {/* Botón ver movimientos */}
+              <div className="flex md:justify-end items-end">
+                <button
+                  type="button"
+                  onClick={() => verMovimientosDeCaja(detalleCaja.id)}
+                  disabled={!detalleCaja?.id}
+                  className="w-full md:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg
+                 bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60
+                 border border-emerald-500/60 shadow focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                  title="Ver movimientos de esta caja"
+                >
+                  {/* ícono opcional */}
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-5 w-5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M3 6h18M3 12h18M3 18h18" strokeLinecap="round" />
+                  </svg>
+                  Ver movimientos de esta caja
+                </button>
+              </div>
               {/* Footer con botón */}
               <div className="mt-7 flex justify-end">
                 <motion.button
@@ -925,6 +1212,330 @@ export default function CajaPOS() {
                 >
                   Cerrar
                 </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ===== Modal detalle movimiento ===== */}
+      <AnimatePresence>
+        {openDetalle && movSel && (
+          <motion.div
+            className="fixed inset-0 z-[80] flex items-end md:items-center justify-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setOpenDetalle(false)}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="detalle-mov-title"
+          >
+            {/* Backdrop */}
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+
+            {/* Sheet/Modal */}
+            <motion.div
+              initial={{ y: 44, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 44, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 160, damping: 18 }}
+              className="relative w-full md:max-w-xl bg-[#14181d] text-gray-100 rounded-t-2xl md:rounded-2xl border border-white/10 shadow-2xl p-5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {(() => {
+                const venta = esVenta(movSel);
+                const egreso = movSel.tipo === 'egreso';
+                const ingreso = movSel.tipo === 'ingreso';
+
+                const bar = ingreso
+                  ? 'from-emerald-500 to-emerald-400'
+                  : egreso
+                  ? 'from-red-500 to-red-400'
+                  : 'from-emerald-500 to-emerald-400';
+
+                const chip = ingreso
+                  ? 'bg-emerald-400/10 text-emerald-300 border border-emerald-400/30'
+                  : egreso
+                  ? 'bg-red-400/10 text-red-300 border border-red-400/30'
+                  : 'bg-emerald-400/10 text-emerald-300 border border-emerald-400/30';
+
+                const amountColor = ingreso
+                  ? 'text-emerald-400'
+                  : 'text-red-400';
+                const sign = ingreso ? '+' : '-';
+
+                return (
+                  <>
+                    {/* Barra superior semántica */}
+                    <div
+                      className={`absolute left-0 right-0 top-0 h-1.5 rounded-t-2xl bg-gradient-to-r ${bar}`}
+                    />
+
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3
+                            id="detalle-mov-title"
+                            className="text-lg font-bold"
+                          >
+                            Detalle de movimiento
+                            {movSel.id ? ` #${movSel.id}` : ''}
+                          </h3>
+                          <span
+                            className={`text-[10px] px-2 py-0.5 rounded-full ${chip}`}
+                          >
+                            {venta ? 'Venta' : ingreso ? 'Ingreso' : 'Egreso'}
+                          </span>
+                        </div>
+                        {/* Descripción (siempre visible, multi-línea) */}
+                        <p className="mt-1 text-sm text-gray-200 whitespace-pre-wrap break-words">
+                          {movSel.descripcion || '—'}
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={() => setOpenDetalle(false)}
+                        className="p-2 rounded-lg bg-white/10 hover:bg-white/20"
+                        aria-label="Cerrar"
+                        title="Cerrar"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    {/* Monto destacado */}
+                    <div className="rounded-xl border border-white/10 bg-black/20 p-4 mb-4">
+                      <div className="text-[11px] uppercase tracking-wide text-gray-400 mb-1">
+                        Monto
+                      </div>
+                      <div
+                        className={`font-mono tabular-nums font-extrabold text-3xl md:text-4xl ${amountColor}`}
+                      >
+                        <span className="mr-1">{sign}</span>
+                        {fmtARS(movSel.monto)}
+                      </div>
+                    </div>
+
+                    {/* Info en grilla */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Tipo */}
+                      <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+                        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-gray-400">
+                          <Hash size={14} /> Tipo
+                        </div>
+                        <div className="mt-0.5 text-sm">
+                          {venta ? 'Venta' : ingreso ? 'Ingreso' : 'Egreso'}
+                        </div>
+                      </div>
+
+                      {/* Caja */}
+                      <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+                        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-gray-400">
+                          <Hash size={14} /> Caja
+                        </div>
+                        <div className="mt-0.5 text-sm">
+                          {movSel.caja_id ? `#${movSel.caja_id}` : '—'}
+                        </div>
+                      </div>
+
+                      {/* Fecha y hora */}
+                      <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+                        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-gray-400">
+                          <CalendarClock size={14} /> Fecha
+                        </div>
+                        <div className="mt-0.5 text-sm font-mono tabular-nums">
+                          {fechaCorta(movSel.fecha)} · {horaCorta(movSel.fecha)}
+                        </div>
+                      </div>
+
+                      {/* Referencia (con copiar y posible link a venta) */}
+                      <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+                        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-gray-400">
+                          <Hash size={14} /> Referencia
+                        </div>
+                        <div className="mt-0.5 text-sm flex items-center gap-2">
+                          <span className="font-mono tabular-nums">
+                            {movSel.referencia || '—'}
+                          </span>
+
+                          {movSel.referencia && (
+                            <button
+                              type="button"
+                              onClick={() => copiar(movSel.referencia)}
+                              className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-white/10 hover:bg-white/20"
+                              title="Copiar referencia"
+                            >
+                              <ClipboardCopy size={14} /> Copiar
+                            </button>
+                          )}
+
+                          {/* Si es ingreso con referencia numérica, abrí “ver detalle de venta” */}
+                          {ingreso &&
+                            movSel.referencia &&
+                            /^\d+$/.test(movSel.referencia) && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  // tu handler existente:
+                                  mostrarDetalleVenta(
+                                    Number(movSel.referencia)
+                                  );
+                                }}
+                                className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded text-emerald-300 bg-emerald-500/10 border border-emerald-400/30 hover:bg-emerald-500/20"
+                                title="Ver detalle de venta"
+                              >
+                                <ExternalLink size={14} /> Ver venta
+                              </button>
+                            )}
+                        </div>
+                      </div>
+
+                      {/* Descripción (full width en sm) */}
+                      <div className="sm:col-span-2 rounded-lg border border-white/10 bg-black/20 p-3">
+                        <div className="text-[11px] uppercase tracking-wide text-gray-400 mb-1">
+                          Descripción
+                        </div>
+                        <div className="text-sm whitespace-pre-wrap break-words">
+                          {movSel.descripcion || '—'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Footer acciones */}
+                    <div className="mt-4 flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => setOpenDetalle(false)}
+                        className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20"
+                      >
+                        Cerrar
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {openMovsCaja && (
+          <motion.div
+            className="fixed inset-0 z-[75] flex items-end md:items-center justify-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setOpenMovsCaja(false)}
+          >
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+            <motion.div
+              initial={{ y: 40, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 40, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 140, damping: 18 }}
+              className="relative w-full md:max-w-2xl bg-[#14181d] text-gray-100 rounded-t-2xl md:rounded-2xl border border-white/10 shadow-2xl p-5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-bold">
+                  Movimientos de la caja #{detalleCaja?.id}
+                </h3>
+                <button
+                  onClick={() => setOpenMovsCaja(false)}
+                  className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20"
+                >
+                  Cerrar
+                </button>
+              </div>
+
+              {/* filtros mini dentro del modal (opcional) */}
+              <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 mb-3">
+                <input
+                  type="date"
+                  value={fDesde}
+                  onChange={(e) => setFDesde(e.target.value)}
+                  className="bg-black/30 border border-white/10 rounded px-2 py-1 text-sm"
+                />
+                <input
+                  type="date"
+                  value={fHasta}
+                  onChange={(e) => setFHasta(e.target.value)}
+                  className="bg-black/30 border border-white/10 rounded px-2 py-1 text-sm"
+                />
+                <select
+                  value={fTipo}
+                  onChange={(e) => setFTipo(e.target.value)}
+                  className="bg-black/30 border border-white/10 rounded px-2 py-1 text-sm"
+                >
+                  <option value="">Todos</option>
+                  <option value="ingreso">Ingresos</option>
+                  <option value="egreso">Egresos</option>
+                </select>
+                <input
+                  value={fQuery}
+                  onChange={(e) => setFQuery(e.target.value)}
+                  placeholder="Buscar…"
+                  className="sm:col-span-2 bg-black/30 border border-white/10 rounded px-2 py-1 text-sm"
+                />
+                <button
+                  onClick={() => verMovimientosDeCaja(detalleCaja.id)}
+                  className="sm:col-span-5 mt-1 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-sm"
+                >
+                  Aplicar filtros
+                </button>
+              </div>
+
+              <div className="max-h-80 overflow-y-auto custom-scrollbar rounded-xl bg-black/20 p-2">
+                {loadingMovs ? (
+                  <p className="text-gray-400 text-center py-6">Cargando…</p>
+                ) : errorMovs ? (
+                  <p className="text-red-400 text-center py-6">{errorMovs}</p>
+                ) : movsCaja.length === 0 ? (
+                  <p className="text-gray-400 text-center py-6">
+                    Sin movimientos…
+                  </p>
+                ) : (
+                  movsCaja.map((m) => (
+                    <div
+                      key={m.id}
+                      className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 p-3 mb-2 rounded-lg bg-black/10 border border-white/10"
+                    >
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full border
+                  ${
+                    m.tipo === 'ingreso'
+                      ? 'bg-emerald-400/10 text-emerald-300 border-emerald-400/30'
+                      : m.tipo === 'egreso'
+                      ? 'bg-red-400/10 text-red-300 border-red-400/30'
+                      : 'bg-emerald-400/10 text-emerald-300 border-emerald-400/30'
+                  }`}
+                      >
+                        {m.tipo}
+                      </span>
+                      <span className="truncate" title={m.descripcion}>
+                        {m.descripcion}
+                      </span>
+                      <span
+                        className={`font-mono tabular-nums ${
+                          m.tipo === 'ingreso'
+                            ? 'text-emerald-300'
+                            : 'text-red-300'
+                        }`}
+                      >
+                        {m.tipo === 'ingreso' ? '+' : '-'}${' '}
+                        {Number(m.monto).toLocaleString('es-AR', {
+                          minimumFractionDigits: 2
+                        })}
+                      </span>
+                      <span className="text-[11px] text-gray-300 font-mono tabular-nums">
+                        {new Date(m.fecha).toLocaleString()}
+                      </span>
+                    </div>
+                  ))
+                )}
               </div>
             </motion.div>
           </motion.div>

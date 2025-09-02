@@ -84,6 +84,63 @@ export default function ProductoSetupWizard({
   // NUEVO: snapshot del PP guardado en BD
   const [ppSnapshot, setPpSnapshot] = useState(null);
 
+  // Caja abierta + UI Paso 3
+  const [cajaActual, setCajaActual] = useState(null);
+  const [cargandoCaja, setCargandoCaja] = useState(false);
+
+  // Paso 3 – egreso opcional
+  const [egresoOn, setEgresoOn] = useState(false);
+  const [egresoMonto, setEgresoMonto] = useState(0);
+  const [egresoDesc, setEgresoDesc] = useState('');
+
+  // Moneda efectivamente guardada para decidir si se puede egresar directo
+  const [lastSavedMoneda, setLastSavedMoneda] = useState('ARS');
+
+  useEffect(() => {
+    if (open && producto) {
+      // ... (lo que ya tenías)
+      setEgresoOn(false);
+      setEgresoMonto(0);
+      setEgresoDesc('');
+      // setPostingEgreso(false);
+      setLastSavedMoneda('ARS');
+      setCajaActual(null);
+    }
+  }, [open, producto]);
+
+  // Detectar caja abierta del usuario (y local si lo tenés)
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      try {
+        setCargandoCaja(true);
+        const r = await fetch(`${BASE_URL}/caja`, {
+          headers: { 'X-User-Id': String(uid ?? '') }
+        });
+        const js = await r.json().catch(() => null);
+        const arr = Array.isArray(js?.data)
+          ? js.data
+          : Array.isArray(js)
+          ? js
+          : [];
+        // ajustá userLocalId si lo tenés como prop/context; si no, quitá ese AND
+        const abierta =
+          arr.find(
+            (c) =>
+              c.usuario_id == uid &&
+              /* c.local_id == userLocalId && */ c.fecha_cierre === null
+          ) ||
+          arr.find((c) => c.fecha_cierre === null) ||
+          null;
+        setCajaActual(abierta);
+      } catch {
+        setCajaActual(null);
+      } finally {
+        setCargandoCaja(false);
+      }
+    })();
+  }, [open, uid, BASE_URL /*, userLocalId*/]);
+
   const goPrev = () => setStep((s) => Math.max(1, s - 1));
   const goNext = () => setStep((s) => Math.min(3, s + 1));
 
@@ -432,12 +489,74 @@ export default function ProductoSetupWizard({
         descuento_porcentaje: clamp(descCompra, 0, 100)
       });
 
+      // moneda guardada para la decisión
+      setLastSavedMoneda(monedaDb);
+
+      // Prefill del egreso si es ARS
+      const totalCompra = compraPreview.total;
+      if (monedaDb === 'ARS') {
+        setEgresoOn(true);
+        setEgresoMonto(Number(totalCompra || 0));
+        setEgresoDesc(
+          `Alta de costo proveedor ${proveedorInicial?.razon_social || ''} · ${
+            producto?.nombre || ''
+          }`.trim()
+        );
+      } else {
+        setEgresoOn(false); // si no es ARS, pedimos convertir manualmente o deshabilitamos
+      }
+
       setStep(3);
       onRefresh?.();
     } catch (e) {
       setError(e.message || 'Error en Paso 2');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function registrarEgresoCaja() {
+    try {
+      if (!egresoOn) return;
+      if (!cajaActual?.id) {
+        alert('No hay caja abierta para este usuario.');
+        return;
+      }
+      if (lastSavedMoneda !== 'ARS') {
+        alert(
+          `El costo está en ${lastSavedMoneda}. Convertí a ARS o ajustá backend para manejar moneda.`
+        );
+        return;
+      }
+      const monto = Number(egresoMonto || 0);
+      if (!monto || isNaN(monto) || monto <= 0) {
+        alert('Monto inválido');
+        return;
+      }
+
+      await fetch(`${BASE_URL}/movimientos_caja`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': String(uid ?? '')
+        },
+        body: JSON.stringify({
+          caja_id: cajaActual.id,
+          tipo: 'egreso',
+          descripcion:
+            egresoDesc ||
+            `Compra proveedor ${proveedorInicial?.razon_social || ''} · ${
+              producto?.nombre || ''
+            }`,
+          monto,
+          referencia: `PP#${ppInicialId}`,
+          usuario_id: uid
+        })
+      });
+      alert('Egreso registrado en caja.');
+      setEgresoOn(false); // opcional: desactivar el toggle
+    } catch {
+      alert('Error al registrar egreso en caja.');
     }
   }
 
@@ -790,15 +909,112 @@ export default function ProductoSetupWizard({
               )}
 
               {step === 3 && (
-                <div className="flex flex-col items-center justify-center py-8">
-                  <CheckCircle2 className="text-emerald-500" size={56} />
-                  <h4 className="mt-3 text-lg font-semibold text-gray-800">
-                    ¡Producto listo!
-                  </h4>
-                  <p className="text-gray-500 text-sm">
-                    Guardamos los datos del producto y la configuración de
-                    costos del proveedor.
-                  </p>
+                <div className="flex flex-col gap-4 py-6">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle2 className="text-emerald-500" size={32} />
+                    <div>
+                      <h4 className="text-lg font-semibold text-gray-800">
+                        ¡Producto listo!
+                      </h4>
+                      <p className="text-gray-500 text-sm">
+                        Guardamos los datos del producto y la configuración de
+                        costos del proveedor.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border p-4 bg-gradient-to-br from-emerald-50/50 to-white">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-semibold text-emerald-700">
+                          ¿Registrar egreso en caja?
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          Se creará un movimiento de tipo <b>egreso</b> con la
+                          compra total.
+                        </div>
+                      </div>
+                      <label className="inline-flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={egresoOn}
+                          onChange={(e) => setEgresoOn(e.target.checked)}
+                        />
+                        <span>Registrar</span>
+                      </label>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">
+                          Caja
+                        </label>
+                        <input
+                          value={
+                            cargandoCaja
+                              ? 'Buscando caja...'
+                              : cajaActual?.nombre ||
+                                (cajaActual?.id
+                                  ? `ID ${cajaActual.id}`
+                                  : 'Sin caja abierta')
+                          }
+                          readOnly
+                          className="w-full px-3 py-2 rounded-lg border bg-gray-50 text-gray-700"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">
+                          Monto (ARS)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={egresoMonto}
+                          onChange={(e) => setEgresoMonto(e.target.value)}
+                          className="w-full px-3 py-2 text-black rounded-lg border"
+                        />
+                      </div>
+                      <div className="md:col-span-3">
+                        <label className="block text-xs text-gray-600 mb-1">
+                          Descripción
+                        </label>
+                        <input
+                          value={egresoDesc}
+                          onChange={(e) => setEgresoDesc(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg text-black border"
+                          placeholder={`Compra proveedor ${
+                            proveedorInicial?.razon_social || ''
+                          } · ${producto?.nombre || ''}`}
+                        />
+                      </div>
+
+                      {lastSavedMoneda !== 'ARS' && (
+                        <div className="md:col-span-3 text-xs text-amber-700 bg-amber-50 border border-amber-100 px-2 py-1 rounded">
+                          La moneda guardada del costo es{' '}
+                          <b>{lastSavedMoneda}</b>. Ingresá manualmente el
+                          equivalente en ARS o ajustá tu backend para registrar
+                          movimientos con moneda/FX.
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-3 flex justify-end">
+                      <button
+                        onClick={registrarEgresoCaja}
+                        disabled={
+                          !egresoOn ||
+                          !cajaActual?.id ||
+                          lastSavedMoneda !== 'ARS' ||
+                          Number(egresoMonto) <= 0
+                        }
+                        className="px-4 py-2 rounded-lg bg-emerald-600 text-white disabled:opacity-60"
+                      >
+                        Registrar egreso
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
