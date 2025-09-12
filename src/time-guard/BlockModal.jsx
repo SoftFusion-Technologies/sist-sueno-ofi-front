@@ -101,7 +101,7 @@ export default function BlockModal({
 
   const title = {
     margin: 0,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 800,
     letterSpacing: 0.1
   };
@@ -251,7 +251,7 @@ export default function BlockModal({
                 <circle cx="12" cy="15" r="1.8" fill="#86efac" />
               </svg>
             </div>
-            <h2 id="tg-title" style={title}>
+            <h2 id="tg-title" className="titulo uppercase" style={title}>
               Sistema bloqueado por hora no válida
             </h2>
             <span style={badge}>
