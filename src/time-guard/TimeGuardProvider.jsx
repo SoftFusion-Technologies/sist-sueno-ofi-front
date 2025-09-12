@@ -1,100 +1,58 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useMemo, useContext, useEffect, useState } from 'react';
 import { timeSync } from './TimeSync.js';
 import BlockModal from './BlockModal.jsx';
 
 const TimeGuardContext = createContext(null);
 
 export function TimeGuardProvider({ axios, children }) {
-  const [state, setState] = useState(timeSync.getState());
+  // snapshot inicial del estado
+  const [snap, setSnap] = useState(() => timeSync.getState());
 
-  // TimeGuardProvider.jsx
+  // init idempotente + suscripción
   useEffect(() => {
-    timeSync.init(); // es idempotente ahora
-    return () => {}; // no desmontes timers acá
+    timeSync.init(); // nuestra clase ya es idempotente
+    const unsubscribe = timeSync.subscribe((s) => setSnap(s));
+    return () => unsubscribe();
   }, []);
 
+  // instalar interceptores de axios (una vez)
   useEffect(() => {
-    let unsub = () => {};
-    (async () => {
-      // Si recibimos axios, instalamos interceptores
-      if (axios) timeSync.installAxios(axios);
-      await timeSync.init();
-      unsub = timeSync.subscribe(setState);
-    })();
-
-    return () => {
-      try {
-        unsub();
-      } catch {}
-    };
+    if (axios) timeSync.installAxios(axios);
+    // no re-instalar en cada render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [axios]);
 
-  const retrySync = async () => timeSync.retrySync();
-
-  const isBlocked =
-    state.locked ||
-    state.status === 'invalid-clock' ||
-    state.status === 'syncing';
+  const isBlocked = useMemo(
+    () =>
+      snap.locked ||
+      snap.status === 'invalid-clock' ||
+      snap.status === 'syncing',
+    [snap.locked, snap.status]
+  );
 
   return (
-    <TimeGuardContext.Provider value={{ ...state, retrySync }}>
+    <>
       <BlockModal
         open={isBlocked}
-        reason={state.reason}
-        skewMs={state.skewMs}
-        toleranceMs={state.toleranceMs}
-        onRetry={retrySync}
+        reason={snap.reason}
+        skewMs={snap.skewMs}
+        toleranceMs={snap.toleranceMs}
+        onRetry={() => timeSync.retrySync()}
       />
 
+      {/* ⚠️ Renderizamos children UNA SOLA VEZ */}
       <div
         style={{
           pointerEvents: isBlocked ? 'none' : 'auto',
           userSelect: isBlocked ? 'none' : 'auto',
           filter: isBlocked ? 'grayscale(0.2)' : 'none'
         }}
-        aria-hidden={isBlocked ? 'true' : undefined}
       >
         {children}
       </div>
-      <div
-        style={{
-          pointerEvents:
-            state.locked || state.status === 'invalid-clock' ? 'none' : 'auto',
-          userSelect:
-            state.locked || state.status === 'invalid-clock' ? 'none' : 'auto',
-          filter:
-            state.locked || state.status === 'invalid-clock'
-              ? 'grayscale(0.2)'
-              : 'none'
-        }}
-        aria-hidden={
-          state.locked || state.status === 'invalid-clock' ? 'true' : undefined
-        }
-      >
-        {children}
-      </div>
-
-      <div
-        style={{
-          pointerEvents:
-            state.locked || state.status === 'invalid-clock' ? 'none' : 'auto',
-          userSelect:
-            state.locked || state.status === 'invalid-clock' ? 'none' : 'auto',
-          filter:
-            state.locked || state.status === 'invalid-clock'
-              ? 'grayscale(0.2)'
-              : 'none'
-        }}
-        aria-hidden={
-          state.locked || state.status === 'invalid-clock' ? 'true' : undefined
-        }
-      >
-        {children}
-      </div>
-    </TimeGuardContext.Provider>
+    </>
   );
 }
-
 export function useTimeGuard() {
   return useContext(TimeGuardContext);
 }
