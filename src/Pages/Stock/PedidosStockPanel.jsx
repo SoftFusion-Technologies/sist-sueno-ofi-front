@@ -19,7 +19,8 @@ import {
   FaMinus,
   FaArrowUp,
   FaCircle,
-  FaArrowsAltH
+  FaArrowsAltH,
+  FaArrowDown
 } from 'react-icons/fa';
 
 import ParticlesBackground from '../../Components/ParticlesBackground';
