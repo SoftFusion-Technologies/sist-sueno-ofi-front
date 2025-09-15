@@ -202,17 +202,17 @@ class TimeSync {
 
       this.checkSkew();
 
-      // Log de depuración en dev
-      if (process.env.NODE_ENV !== 'production') {
-        console.debug('[TimeGuard] tick', {
-          deviceNow: Date.now(),
-          virtualNow: this.virtualNow(),
-          skewMs: this.skewMs,
-          status: this.status,
-          reason: this.reason,
-          locked: this.locked
-        });
-      }
+      // // Log de depuración en dev
+      // if (process.env.NODE_ENV !== 'production') {
+      //   console.debug('[TimeGuard] tick', {
+      //     deviceNow: Date.now(),
+      //     virtualNow: this.virtualNow(),
+      //     skewMs: this.skewMs,
+      //     status: this.status,
+      //     reason: this.reason,
+      //     locked: this.locked
+      //   });
+      // }
 
       // Notificar cambios reales
       if (this.status !== prevStatus || Math.abs(this.skewMs - prevSkew) > 1) {
