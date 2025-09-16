@@ -41,7 +41,7 @@ export default function PuntoVenta() {
   const [loadingMediosPago, setLoadingMediosPago] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [medioPago, setMedioPago] = useState(null);
-  const { userId, userLocalId } = useAuth();
+  const { userId, userLocalId, userIsReemplazante } = useAuth();
   const [modalNuevoClienteOpen, setModalNuevoClienteOpen] = useState(false);
   const [aplicarDescuento, setAplicarDescuento] = useState(true);
   const [descuentoPersonalizado, setDescuentoPersonalizado] = useState('');
@@ -114,74 +114,79 @@ export default function PuntoVenta() {
 
   const debouncedBusqueda = useDebouncedValue(busqueda, 600); // ⬅️ pausa de 400ms
 
-useEffect(() => {
-  let ignore = false;
-  const controller = new AbortController();
-  const q = (debouncedBusqueda || '').trim();
+  useEffect(() => {
+    let ignore = false;
+    const controller = new AbortController();
+    const q = (debouncedBusqueda || '').trim();
 
-  // umbral mínimo de caracteres opcional
-  if (q.length < 2) {
-    setProductos([]);
-    setOtrosLocales([]);
-    setModalOtrosOpen(false);
-    return () => controller.abort();
-  }
-
-  (async () => {
-    try {
-      setLoading(true);
-
-      const params = new URLSearchParams({
-        query: q,
-        local_id: String(userLocalId || ''),
-        include_otros: '1'
-      });
-
-      const res = await fetch(
-        `http://localhost:8080/buscar-productos-detallado?${params}`,
-        { signal: controller.signal }
-      );
-      if (!res.ok) throw new Error(`Error ${res.status}`);
-
-      const payload = await res.json();
-
-      let itemsLocal = Array.isArray(payload)
-        ? payload
-        : Array.isArray(payload.items_local)
-        ? payload.items_local
-        : [];
-
-      let itemsOtros = Array.isArray(payload?.otros_items)
-        ? payload.otros_items
-        : [];
-
-      if (ignore) return;
-
-      setProductos(itemsLocal);
-      setOtrosLocales(itemsOtros);
-
-      // 🔔 Abrir modal SOLO si el usuario hizo pausa (debounce),
-      // no hay stock local y sí hay en otras sucursales.
-      setModalOtrosOpen(itemsLocal.length === 0 && itemsOtros.length > 0);
-    } catch (e) {
-      if (e.name !== 'AbortError') {
-        console.error('Error al buscar productos:', e);
-        if (!ignore) {
-          setProductos([]);
-          setOtrosLocales([]);
-          setModalOtrosOpen(false);
-        }
-      }
-    } finally {
-      if (!ignore) setLoading(false);
+    // umbral mínimo de caracteres opcional
+    if (q.length < 2) {
+      setProductos([]);
+      setOtrosLocales([]);
+      setModalOtrosOpen(false);
+      return () => controller.abort();
     }
-  })();
 
-  return () => {
-    ignore = true;
-    controller.abort(); // ⛔ cancela la request anterior si el user sigue tipeando
-  };
-}, [debouncedBusqueda, userLocalId]);
+    (async () => {
+      try {
+        setLoading(true);
+
+        const params = new URLSearchParams({
+          query: q,
+          local_id: String(userLocalId || ''),
+          include_otros: '1'
+        });
+          
+        const res = await fetch(
+          `http://localhost:8080/buscar-productos-detallado?${params}`,
+          {
+            signal: controller.signal,
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem('authToken') || ''}`
+            }
+          }
+        );
+        if (!res.ok) throw new Error(`Error ${res.status}`);
+
+        const payload = await res.json();
+
+        let itemsLocal = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload.items_local)
+          ? payload.items_local
+          : [];
+
+        let itemsOtros = Array.isArray(payload?.otros_items)
+          ? payload.otros_items
+          : [];
+
+        if (ignore) return;
+
+        setProductos(itemsLocal);
+        setOtrosLocales(itemsOtros);
+
+        // 🔔 Abrir modal SOLO si el usuario hizo pausa (debounce),
+        // no hay stock local y sí hay en otras sucursales.
+        setModalOtrosOpen(itemsLocal.length === 0 && itemsOtros.length > 0);
+      } catch (e) {
+        if (e.name !== 'AbortError') {
+          console.error('Error al buscar productos:', e);
+          if (!ignore) {
+            setProductos([]);
+            setOtrosLocales([]);
+            setModalOtrosOpen(false);
+          }
+        }
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    })();
+
+    return () => {
+      ignore = true;
+      controller.abort(); // ⛔ cancela la request anterior si el user sigue tipeando
+    };
+  }, [debouncedBusqueda, userLocalId]);
 
   // cuando no hay stock local pero sí otros
   useEffect(() => {

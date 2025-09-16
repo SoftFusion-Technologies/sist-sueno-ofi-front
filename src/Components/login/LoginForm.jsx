@@ -80,7 +80,8 @@ const LoginForm = () => {
               res.data.nombre,
               res.data.email,
               res.data.rol,
-              res.data.local_id
+              res.data.local_id,
+              res.data.es_reemplazante
             );
 
             if (res.data.rol === 'vendedor') {

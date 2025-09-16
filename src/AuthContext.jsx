@@ -22,6 +22,7 @@ export const AuthProvider = ({ children }) => {
   const [userEmail, setUserEmail] = useState('');
   const [userLevel, setUserLevel] = useState('');
   const [userLocalId, setUserLocalId] = useState(null);
+  const [userIsReemplazante, setUserIsReemplazante] = useState(false);
 
   const logout = () => {
     setAuthToken(null);
@@ -30,6 +31,7 @@ export const AuthProvider = ({ children }) => {
     setUserEmail('');
     setUserLevel('');
     setUserLocalId(null);
+    setUserIsReemplazante(false);
 
     localStorage.removeItem('authToken');
     localStorage.removeItem('userId');
@@ -37,6 +39,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('userEmail');
     localStorage.removeItem('userLevel');
     localStorage.removeItem('userLocalId');
+    localStorage.removeItem('userIsReemplazante');
   };
 
   useEffect(() => {
@@ -46,6 +49,7 @@ export const AuthProvider = ({ children }) => {
     const email = localStorage.getItem('userEmail');
     const role = localStorage.getItem('userLevel');
     const localId = localStorage.getItem('userLocalId');
+    const isReemplazante = localStorage.getItem('userIsReemplazante');
 
     if (token) {
       try {
@@ -67,6 +71,7 @@ export const AuthProvider = ({ children }) => {
     if (email) setUserEmail(email);
     if (role) setUserLevel(role);
     if (localId) setUserLocalId(localId);
+    if (isReemplazante) setUserIsReemplazante(isReemplazante === 'true');
 
     const handleBeforeUnload = () => {
       localStorage.removeItem('authToken');
@@ -75,6 +80,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('userEmail');
       localStorage.removeItem('userLevel');
       localStorage.removeItem('userLocalId');
+      localStorage.removeItem('userIsReemplazante');
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -83,13 +89,14 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
-  const login = (token, id, name, email, role, localId) => {
+  const login = (token, id, name, email, role, localId, esReemplazante) => {
     setAuthToken(token);
     setUserId(id);
     setUserName(name);
     setUserEmail(email);
     setUserLevel(role);
     setUserLocalId(localId);
+    setUserIsReemplazante(!!esReemplazante);
 
     localStorage.setItem('authToken', token);
     localStorage.setItem('userId', id);
@@ -97,6 +104,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('userEmail', email);
     localStorage.setItem('userLevel', role);
     localStorage.setItem('userLocalId', localId);
+    localStorage.setItem('userIsReemplazante', (!!esReemplazante).toString());
   };
 
   return (
@@ -108,6 +116,7 @@ export const AuthProvider = ({ children }) => {
         userEmail,
         userLevel,
         userLocalId,
+        userIsReemplazante,
         login,
         logout
       }}
