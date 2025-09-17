@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import axios from 'axios';
 import Modal from 'react-modal';
 import { motion } from 'framer-motion';
@@ -134,20 +134,58 @@ const StockGet = () => {
   const [showLocalesPicker, setShowLocalesPicker] = useState(false);
   const [localesQuery, setLocalesQuery] = useState('');
 
+  // 🔁 Paginación / orden server-side
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(6);
+  const [orderBy, setOrderBy] = useState('id'); // id | created_at | updated_at | producto_nombre
+  const [orderDir, setOrderDir] = useState('ASC'); // ASC | DESC
+  const [meta, setMeta] = useState(null);
+
+  // 🔎 filtros server-side (y client-side fallback)
+  const [q, setQ] = useState('');
+  const [productoId, setProductoId] = useState('');
+  const [localId, setLocalId] = useState('');
+  const [lugarId, setLugarId] = useState('');
+  const [estadoId, setEstadoId] = useState('');
+
+  // para “debounce” lógico de búsqueda
+  const debouncedQ = useMemo(() => q.trim(), [q]);
+
   const fetchAll = async () => {
     try {
       const [resStock, resProd, resLocales, resLugares, resEstados] =
         await Promise.all([
-          axios.get('http://localhost:8080/stock'),
+          axios.get('http://localhost:8080/stock', {
+            params: {
+              page,
+              limit,
+              q: debouncedQ || undefined,
+              productoId: productoId || undefined,
+              localId: localId || undefined,
+              lugarId: lugarId || undefined,
+              estadoId: estadoId || undefined,
+              orderBy,
+              orderDir
+            }
+          }),
           axios.get('http://localhost:8080/productos'),
-          // axios.get('http://localhost:8080/talles'),
           axios.get('http://localhost:8080/locales'),
           axios.get('http://localhost:8080/lugares'),
           axios.get('http://localhost:8080/estados')
         ]);
-      setStock(resStock.data);
-      setProductos(resProd.data);
-      // setTalles(resTalles.data);
+
+      // /stock puede devolver array (retrocompat) o {data, meta}
+      if (Array.isArray(resStock.data)) {
+        setStock(resStock.data); // array plano
+        setMeta(null);
+      } else {
+        setStock(resStock.data?.data || []);
+        setMeta(resStock.data?.meta || null);
+      }
+
+      setProductos(
+        Array.isArray(resProd.data) ? resProd.data : resProd.data?.data || []
+      );
       setLocales(
         Array.isArray(resLocales.data)
           ? resLocales.data
@@ -177,7 +215,18 @@ const StockGet = () => {
 
   useEffect(() => {
     fetchAll();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    page,
+    limit,
+    orderBy,
+    orderDir,
+    debouncedQ,
+    productoId,
+    localId,
+    lugarId,
+    estadoId
+  ]);
 
   const openModal = (item = null, group = null) => {
     if (item) {
@@ -473,34 +522,96 @@ const StockGet = () => {
 
     XLSX.writeFile(workbook, nombreArchivo);
   };
-  // Agrupar el stock sin considerar talles
-  const stockAgrupado = [];
-  filtered.forEach((item) => {
-    const key = [
-      item.producto_id,
-      item.local_id,
-      item.lugar_id,
-      item.estado_id,
-      item.en_exhibicion
-    ].join('-');
 
-    let group = stockAgrupado.find((g) => g.key === key);
+  // Si hay meta => backend ya filtró/paginó. Si no hay meta => filtrá vos (si ya lo hacías).
+  const stockBase = useMemo(() => {
+    if (meta) return stock;
 
-    if (!group) {
-      group = {
-        key,
-        producto_id: item.producto_id,
-        local_id: item.local_id,
-        lugar_id: item.lugar_id,
-        estado_id: item.estado_id,
-        en_exhibicion: item.en_exhibicion,
-        items: []
-      };
-      stockAgrupado.push(group);
+    // 🔻 Fallback cliente (opcional): filtrar por q / ids solo si antes lo hacías así
+    const qLower = debouncedQ.toLowerCase();
+    return stock
+      .filter((s) =>
+        !debouncedQ
+          ? true
+          : // intenta matchear con producto asociado si lo tenés en memoria
+            (productos.find((p) => p.id === s.producto_id)?.nombre || '')
+              .toLowerCase()
+              .includes(qLower)
+      )
+      .filter((s) => (productoId ? s.producto_id === Number(productoId) : true))
+      .filter((s) => (localId ? s.local_id === Number(localId) : true))
+      .filter((s) => (lugarId ? s.lugar_id === Number(lugarId) : true))
+      .filter((s) => (estadoId ? s.estado_id === Number(estadoId) : true));
+  }, [
+    meta,
+    stock,
+    debouncedQ,
+    productoId,
+    localId,
+    lugarId,
+    estadoId,
+    productos
+  ]);
+
+  const stockAgrupado = useMemo(() => {
+    const out = [];
+    const map = new Map(); // key -> index en out
+
+    for (const item of stockBase) {
+      const key = [
+        item.producto_id,
+        item.local_id,
+        item.lugar_id,
+        item.estado_id,
+        item.en_exhibicion ? 1 : 0
+      ].join('-');
+
+      let idx = map.get(key);
+      if (idx === undefined) {
+        idx = out.length;
+        map.set(key, idx);
+        out.push({
+          key,
+          producto_id: item.producto_id,
+          local_id: item.local_id,
+          lugar_id: item.lugar_id,
+          estado_id: item.estado_id,
+          en_exhibicion: !!item.en_exhibicion,
+          items: []
+        });
+      }
+      out[idx].items.push(item);
     }
 
-    group.items.push(item);
-  });
+    return out;
+  }, [stockBase]);
+
+  const groupsPerPage = limit; // usá el mismo selector "limit" para simplificar
+  const groupPageStart = (page - 1) * groupsPerPage;
+
+  const THRESHOLD = Number(UMBRAL_STOCK_BAJO ?? 3);
+
+  const gruposFiltrados = useMemo(() => {
+    if (!verSoloStockBajo) return stockAgrupado;
+    return stockAgrupado.filter(
+      (g) =>
+        g.items.reduce((s, i) => s + (Number(i.cantidad) || 0), 0) <= THRESHOLD
+    );
+  }, [stockAgrupado, verSoloStockBajo, THRESHOLD]);
+
+  const gruposVisibles = meta
+    ? gruposFiltrados
+    : gruposFiltrados.slice(groupPageStart, groupPageStart + groupsPerPage);
+  const totalGroups = meta
+    ? meta.total /* de filas, no grupos */
+    : stockAgrupado.length;
+  const totalPages = meta
+    ? meta.totalPages
+    : Math.max(Math.ceil(stockAgrupado.length / groupsPerPage), 1);
+
+  const currPage = meta ? meta.page : page;
+  const hasPrev = meta ? meta.hasPrev : currPage > 1;
+  const hasNext = meta ? meta.hasNext : currPage < totalPages;
 
   const handleImprimirCodigoBarra = (item) => {
     setSkuParaImprimir(item);
@@ -736,94 +847,6 @@ const StockGet = () => {
           </div>
         </div>
 
-        <input
-          type="text"
-          placeholder="Buscar producto..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full mb-6 px-4 py-2 rounded-lg border border-gray-600 bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-        />
-
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
-          {/* Filtro por Local */}
-          <select
-            value={localFiltro}
-            onChange={(e) => setLocalFiltro(e.target.value)}
-            className="p-2 rounded bg-gray-800 text-white"
-          >
-            <option value="todos">Todos los locales</option>
-            {locales.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.nombre}
-              </option>
-            ))}
-          </select>
-
-          {/* Filtro por Lugar */}
-          <select
-            value={lugarFiltro}
-            onChange={(e) => setLugarFiltro(e.target.value)}
-            className="p-2 rounded bg-gray-800 text-white"
-          >
-            <option value="todos">Todos los lugares</option>
-            {lugares.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.nombre}
-              </option>
-            ))}
-          </select>
-
-          {/* Filtro por Estado */}
-          <select
-            value={estadoFiltro}
-            onChange={(e) => setEstadoFiltro(e.target.value)}
-            className="p-2 rounded bg-gray-800 text-white"
-          >
-            <option value="todos">Todos los estados</option>
-            {estados.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.nombre}
-              </option>
-            ))}
-          </select>
-
-          {/* Filtro por exhibición */}
-          <select
-            value={enPercheroFiltro}
-            onChange={(e) => setEnPercheroFiltro(e.target.value)}
-            className="p-2 rounded bg-gray-800 text-white"
-          >
-            <option value="todos">Todos</option>
-            <option value="true">En exhibición</option>
-            <option value="false">No en exhibición</option>
-          </select>
-
-          {/* Filtro por cantidad */}
-          <input
-            type="number"
-            placeholder="Cantidad mínima"
-            value={cantidadMin}
-            onChange={(e) => setCantidadMin(e.target.value)}
-            className="p-2 rounded bg-gray-800 text-white"
-          />
-          <input
-            type="number"
-            placeholder="Cantidad máxima"
-            value={cantidadMax}
-            onChange={(e) => setCantidadMax(e.target.value)}
-            className="p-2 rounded bg-gray-800 text-white"
-          />
-
-          {/* Filtro por SKU */}
-          <input
-            type="text"
-            placeholder="Buscar por SKU"
-            value={skuFiltro}
-            onChange={(e) => setSkuFiltro(e.target.value)}
-            className="p-2 rounded bg-gray-800 text-white"
-          />
-        </div>
-
         <button
           onClick={() => setVerSoloStockBajo((prev) => !prev)}
           className={`px-4 mb-2 py-2 rounded-lg font-semibold flex items-center gap-2 transition ${
@@ -835,11 +858,200 @@ const StockGet = () => {
           {verSoloStockBajo ? 'Ver Todos' : 'Mostrar Stock Bajo'}
         </button>
 
+        {/* Búsqueda + filtros */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+          <input
+            type="text"
+            placeholder="Buscar por producto..."
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setPage(1);
+            }}
+            className="px-4 py-2 rounded-lg border bg-gray-800 border-gray-600 text-white"
+          />
+
+          <select
+            value={productoId}
+            onChange={(e) => {
+              setProductoId(e.target.value);
+              setPage(1);
+            }}
+            className="px-4 py-2 rounded-lg border bg-gray-800 border-gray-600 text-white"
+          >
+            <option value="">Todos los productos</option>
+            {productos.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.nombre}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={localId}
+            onChange={(e) => {
+              setLocalId(e.target.value);
+              setPage(1);
+            }}
+            className="px-4 py-2 rounded-lg border bg-gray-800 border-gray-600 text-white"
+          >
+            <option value="">Todos los locales</option>
+            {locales.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.nombre}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={lugarId}
+            onChange={(e) => {
+              setLugarId(e.target.value);
+              setPage(1);
+            }}
+            className="px-4 py-2 rounded-lg border bg-gray-800 border-gray-600 text-white"
+          >
+            <option value="">Todos los lugares</option>
+            {lugares.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.nombre}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={estadoId}
+            onChange={(e) => {
+              setEstadoId(e.target.value);
+              setPage(1);
+            }}
+            className="px-4 py-2 rounded-lg border bg-gray-800 border-gray-600 text-white"
+          >
+            <option value="">Todos los estados</option>
+            {estados.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.nombre}
+              </option>
+            ))}
+          </select>
+
+          <div className="flex gap-2 items-center">
+            <select
+              value={orderBy}
+              onChange={(e) => {
+                setOrderBy(e.target.value);
+                setPage(1);
+              }}
+              className="px-2 py-2 rounded-lg bg-gray-800 border border-gray-700"
+            >
+              <option value="id">Orde. por ID</option>
+              <option value="producto_nombre">Ordenar por Producto</option>
+              {/* <option value="created_at">Creación</option>
+              <option value="updated_at">Actualización</option> */}
+            </select>
+            <select
+              value={orderDir}
+              onChange={(e) => {
+                setOrderDir(e.target.value);
+                setPage(1);
+              }}
+              className="px-3 py-2 rounded-lg bg-gray-800 border border-gray-700"
+            >
+              <option value="ASC">Asc</option>
+              <option value="DESC">Desc</option>
+            </select>
+            <select
+              value={limit}
+              onChange={(e) => {
+                setLimit(Number(e.target.value));
+                setPage(1);
+              }}
+              className="px-3 py-2 rounded-lg bg-gray-800 border border-gray-700"
+            >
+              <option value={6}>6</option>
+              <option value={12}>12</option>
+              <option value={24}>24</option>
+              <option value={48}>48</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Info + paginación */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <div className="text-white/80 text-xs sm:text-sm">
+            Total: <b>{meta?.total ?? totalGroups}</b> · Página{' '}
+            <b>{currPage}</b> de <b>{totalPages}</b>
+          </div>
+          <div className="-mx-2 sm:mx-0">
+            <div className="overflow-x-auto no-scrollbar px-2 sm:px-0">
+              <div className="inline-flex items-center whitespace-nowrap gap-2">
+                <button
+                  className="px-3 py-2 rounded-lg bg-gray-700 text-white disabled:opacity-40"
+                  onClick={() => setPage(1)}
+                  disabled={!hasPrev}
+                >
+                  «
+                </button>
+                <button
+                  className="px-3 py-2 rounded-lg bg-gray-700 text-white disabled:opacity-40"
+                  onClick={() => setPage((p) => Math.max(p - 1, 1))}
+                  disabled={!hasPrev}
+                >
+                  ‹
+                </button>
+
+                <div className="flex flex-wrap gap-2 max-w-[80vw]">
+                  {Array.from({ length: totalPages })
+                    .slice(
+                      Math.max(0, currPage - 3),
+                      Math.max(0, currPage - 3) + 6
+                    )
+                    .map((_, idx) => {
+                      const start = Math.max(1, currPage - 2);
+                      const num = start + idx;
+                      if (num > totalPages) return null;
+                      const active = num === currPage;
+                      return (
+                        <button
+                          key={num}
+                          onClick={() => setPage(num)}
+                          className={`px-3 py-2 rounded-lg border ${
+                            active
+                              ? 'bg-cyan-600 border-cyan-400'
+                              : 'bg-gray-800 border-gray-700 hover:bg-gray-700'
+                          }`}
+                          aria-current={active ? 'page' : undefined}
+                        >
+                          {num}
+                        </button>
+                      );
+                    })}
+                </div>
+
+                <button
+                  className="px-3 py-2 rounded-lg bg-gray-700 text-white disabled:opacity-40"
+                  onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
+                  disabled={!hasNext}
+                >
+                  ›
+                </button>
+                <button
+                  className="px-3 py-2 rounded-lg bg-gray-700 text-white disabled:opacity-40"
+                  onClick={() => setPage(totalPages)}
+                  disabled={!hasNext}
+                >
+                  »
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <motion.div
           layout
           className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
         >
-          {stockAgrupado.map((group, idx) => {
+          {gruposVisibles.map((group, idx) => {
             const producto = productos.find((p) => p.id === group.producto_id);
             const local = locales.find((l) => l.id === group.local_id);
             const lugar = lugares.find((l) => l.id === group.lugar_id);
@@ -901,14 +1113,14 @@ const StockGet = () => {
                 <p className="text-sm flex items-center gap-2">
                   <span
                     className={
-                      cantidadTotal <= UMBRAL_STOCK_BAJO
+                      cantidadTotal <= THRESHOLD
                         ? 'text-red-400'
                         : 'text-green-300'
                     }
                   >
                     Cantidad total: {cantidadTotal}
                   </span>
-                  {cantidadTotal <= UMBRAL_STOCK_BAJO && (
+                  {cantidadTotal <= THRESHOLD && (
                     <span className="flex items-center text-red-500 font-bold text-xs animate-pulse">
                       <FaExclamationTriangle className="mr-1" />
                       ¡Stock bajo!
