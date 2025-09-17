@@ -148,7 +148,11 @@ const StockGet = () => {
       setStock(resStock.data);
       setProductos(resProd.data);
       // setTalles(resTalles.data);
-      setLocales(resLocales.data);
+      setLocales(
+        Array.isArray(resLocales.data)
+          ? resLocales.data
+          : resLocales.data?.data || []
+      );
       setLugares(
         Array.isArray(resLugares.data)
           ? resLugares.data
@@ -870,7 +874,7 @@ const StockGet = () => {
               <motion.div
                 key={group.key}
                 layout
-                className="bg-white/10 p-6 rounded-2xl shadow-md border border-white/10 hover:scale-[1.02] transition-all"
+                className="bg-white/10 p-6 rounded-2xl shadow-md border border-white/10 hover:scale-[1.02]"
               >
                 <h2 className="text-xl font-bold text-cyan-300 mb-1 uppercase">
                   {producto?.nombre}
