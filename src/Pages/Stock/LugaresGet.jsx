@@ -377,7 +377,7 @@ const LugaresGet = () => {
           overlayClassName="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50"
           className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl border-l-4 border-pink-500"
         >
-          <h2 className="text-2xl font-bold mb-4 text-pink-600">
+          <h2 className="uppercase text-2xl font-bold mb-4 text-pink-600">
             {editId ? 'Editar Lugar' : 'Nuevo Lugar'}
           </h2>
           <form onSubmit={handleSubmit} className="space-y-4">

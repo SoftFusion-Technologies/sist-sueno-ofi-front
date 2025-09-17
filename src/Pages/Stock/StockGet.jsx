@@ -154,7 +154,11 @@ const StockGet = () => {
           ? resLugares.data
           : resLugares.data?.data || []
       );
-      setEstados(resEstados.data);
+      setEstados(
+        Array.isArray(resEstados.data)
+          ? resEstados.data
+          : resEstados.data?.data || []
+      );
     } catch (err) {
       setModalFeedbackMsg(
         'Ocurrió un error al cargar los datos.\n' +
