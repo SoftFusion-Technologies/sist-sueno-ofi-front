@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import axios from 'axios';
 import Modal from 'react-modal';
 import { motion } from 'framer-motion';
@@ -20,10 +20,22 @@ import { getUserId } from '../../../utils/authUtils';
 Modal.setAppElement('#root');
 
 const CombosGet = () => {
+  // 🔁 Paginación / orden
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(12);
+  const [orderBy, setOrderBy] = useState('id'); // id | nombre | precio_fijo | cantidad_items | created_at | updated_at | estado
+  const [orderDir, setOrderDir] = useState('DESC'); // default: DESC como original
+  const [meta, setMeta] = useState(null);
+
+  // Si querés filtro por estado en la lista (no sólo en el modal)
+  const [estadoListFilter, setEstadoListFilter] = useState(''); // ''=Todos, 'activo', 'inactivo'
+
   const [combos, setCombos] = useState([]);
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState(null);
+
+  const debouncedQ = useMemo(() => search.trim(), [search]);
 
   const [formNombre, setFormNombre] = useState('');
   const [formDescripcion, setFormDescripcion] = useState('');
@@ -38,8 +50,25 @@ const CombosGet = () => {
 
   const fetchCombos = async () => {
     try {
-      const res = await axios.get('http://localhost:8080/combos');
-      setCombos(res.data);
+      const res = await axios.get('http://localhost:8080/combos', {
+        params: {
+          page,
+          limit,
+          q: debouncedQ || undefined,
+          estado: estadoListFilter || undefined, // si usás el filtro de estado
+          orderBy,
+          orderDir
+          // Podés agregar minPrecio/maxPrecio/minItems/maxItems cuando sumes inputs
+        }
+      });
+
+      if (Array.isArray(res.data)) {
+        setCombos(res.data);
+        setMeta(null);
+      } else {
+        setCombos(res.data?.data || []);
+        setMeta(res.data?.meta || null);
+      }
     } catch (error) {
       console.error('Error al obtener combos:', error);
     }
@@ -47,11 +76,42 @@ const CombosGet = () => {
 
   useEffect(() => {
     fetchCombos();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, limit, orderBy, orderDir, debouncedQ, estadoListFilter]);
 
-  const filteredCombos = combos.filter((c) =>
-    c.nombre.toLowerCase().includes(search.toLowerCase())
-  );
+  // Si hay meta => backend ya paginó/filtró
+  // Si no hay meta (array plano) => filtramos y “paginamos” en cliente
+  const clientFiltered = useMemo(() => {
+    if (meta) return combos;
+    const q = search.toLowerCase();
+    const base = combos
+      .filter((c) => c.nombre?.toLowerCase().includes(q))
+      .filter((c) => (estadoListFilter ? c.estado === estadoListFilter : true));
+
+    // paginado cliente para UI consistente
+    const start = (page - 1) * limit;
+    return base.slice(start, start + limit);
+  }, [meta, combos, search, estadoListFilter, page, limit]);
+
+  const rows = meta ? combos : clientFiltered;
+
+  const total =
+    meta?.total ??
+    (meta
+      ? 0
+      : (() => {
+          const q = search.toLowerCase();
+          return combos
+            .filter((c) => c.nombre?.toLowerCase().includes(q))
+            .filter((c) =>
+              estadoListFilter ? c.estado === estadoListFilter : true
+            ).length;
+        })());
+
+  const totalPages = meta?.totalPages ?? Math.max(Math.ceil(total / limit), 1);
+  const currPage = meta?.page ?? page;
+  const hasPrev = meta?.hasPrev ?? currPage > 1;
+  const hasNext = meta?.hasNext ?? currPage < totalPages;
 
   const openModal = (combo = null) => {
     setEditId(combo ? combo.id : null);
@@ -158,15 +218,146 @@ const CombosGet = () => {
           className="w-full mb-6 px-4 py-2 rounded-lg border border-gray-600 bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
         />
 
+        {/* Filtros de lista (opcional) */}
+        <div className="flex flex-col sm:flex-row gap-3 mb-4">
+          <select
+            value={estadoListFilter}
+            onChange={(e) => {
+              setEstadoListFilter(e.target.value);
+              setPage(1);
+            }}
+            className="px-3 py-2 rounded-lg bg-gray-800 border border-gray-700"
+          >
+            <option value="">Todos los estados</option>
+            <option value="activo">Activo</option>
+            <option value="inactivo">Inactivo</option>
+          </select>
+        </div>
+
+        {/* Info + paginación/orden */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+          <div className="text-white/80 text-xs sm:text-sm">
+            Total: <b>{total}</b> · Página <b>{currPage}</b> de{' '}
+            <b>{totalPages}</b>
+          </div>
+          <div className="-mx-2 sm:mx-0">
+            <div className="overflow-x-auto no-scrollbar px-2 sm:px-0">
+              <div className="inline-flex items-center whitespace-nowrap gap-2">
+                <button
+                  className="px-3 py-2 rounded-lg bg-gray-700 text-white disabled:opacity-40"
+                  onClick={() => setPage(1)}
+                  disabled={!hasPrev}
+                >
+                  «
+                </button>
+                <button
+                  className="px-3 py-2 rounded-lg bg-gray-700 text-white disabled:opacity-40"
+                  onClick={() => setPage((p) => Math.max(p - 1, 1))}
+                  disabled={!hasPrev}
+                >
+                  ‹
+                </button>
+
+                <div className="flex flex-wrap gap-2 max-w-[80vw]">
+                  {Array.from({ length: totalPages })
+                    .slice(
+                      Math.max(0, currPage - 3),
+                      Math.max(0, currPage - 3) + 6
+                    )
+                    .map((_, idx) => {
+                      const start = Math.max(1, currPage - 2);
+                      const num = start + idx;
+                      if (num > totalPages) return null;
+                      const active = num === currPage;
+                      return (
+                        <button
+                          key={num}
+                          onClick={() => setPage(num)}
+                          className={`px-3 py-2 rounded-lg border ${
+                            active
+                              ? 'bg-purple-600 border-purple-400'
+                              : 'bg-gray-800 border-gray-700 hover:bg-gray-700'
+                          }`}
+                          aria-current={active ? 'page' : undefined}
+                        >
+                          {num}
+                        </button>
+                      );
+                    })}
+                </div>
+
+                <button
+                  className="px-3 py-2 rounded-lg bg-gray-700 text-white disabled:opacity-40"
+                  onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
+                  disabled={!hasNext}
+                >
+                  ›
+                </button>
+                <button
+                  className="px-3 py-2 rounded-lg bg-gray-700 text-white disabled:opacity-40"
+                  onClick={() => setPage(totalPages)}
+                  disabled={!hasNext}
+                >
+                  »
+                </button>
+
+                {/* Límite por página */}
+                <select
+                  value={limit}
+                  onChange={(e) => {
+                    setLimit(Number(e.target.value));
+                    setPage(1);
+                  }}
+                  className="ml-3 px-3 py-2 rounded-lg bg-gray-800 border border-gray-700"
+                >
+                  <option value={6}>6</option>
+                  <option value={12}>12</option>
+                  <option value={24}>24</option>
+                  <option value={48}>48</option>
+                </select>
+
+                {/* Orden server-side */}
+                <select
+                  value={orderBy}
+                  onChange={(e) => {
+                    setOrderBy(e.target.value);
+                    setPage(1);
+                  }}
+                  className="ml-2 px-3 py-2 rounded-lg bg-gray-800 border border-gray-700"
+                >
+                  <option value="id">ID</option>
+                  <option value="nombre">Nombre</option>
+                  <option value="precio_fijo">Precio</option>
+                  <option value="cantidad_items">Items</option>
+                  {/* <option value="created_at">Creación</option>
+                  <option value="updated_at">Actualización</option> */}
+                  <option value="estado">Estado</option>
+                </select>
+                <select
+                  value={orderDir}
+                  onChange={(e) => {
+                    setOrderDir(e.target.value);
+                    setPage(1);
+                  }}
+                  className="px-3 py-2 rounded-lg bg-gray-800 border border-gray-700"
+                >
+                  <option value="ASC">Ascendente</option>
+                  <option value="DESC">Descendente</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <motion.div
           layout
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
         >
-          {filteredCombos.map((combo) => (
+          {rows.map((combo) => (
             <motion.div
               key={combo.id}
               layout
-              className="bg-white/10 p-6 rounded-2xl shadow-md backdrop-blur-md border border-white/10 hover:scale-[1.02] transition-all"
+              className="bg-white/10 p-6 rounded-2xl shadow-md backdrop-blur-md border border-white/10 hover:scale-[1.02]"
             >
               <h2 className="text-xl font-bold text-white">{combo.nombre}</h2>
               <p className="text-sm text-gray-300 mb-2">
@@ -198,7 +389,7 @@ const CombosGet = () => {
               />
               <Link
                 to={`/dashboard/stock/combos/${combo.id}/permitidos`}
-                className="text-sm mt-2 inline-block text-purple-300 hover:text-purple-500 font-semibold"
+                className="text-sm  inline-block text-purple-300 hover:text-purple-500 font-semibold"
               >
                 Editar productos permitidos
               </Link>
