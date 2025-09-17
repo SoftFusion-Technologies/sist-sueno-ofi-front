@@ -149,7 +149,11 @@ const StockGet = () => {
       setProductos(resProd.data);
       // setTalles(resTalles.data);
       setLocales(resLocales.data);
-      setLugares(resLugares.data);
+      setLugares(
+        Array.isArray(resLugares.data)
+          ? resLugares.data
+          : resLugares.data?.data || []
+      );
       setEstados(resEstados.data);
     } catch (err) {
       setModalFeedbackMsg(
