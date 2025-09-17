@@ -24,6 +24,13 @@ Modal.setAppElement('#root');
 const BASE_URL = 'http://localhost:8080';
 
 const ProductosGet = () => {
+  // 🔁 Paginación / orden server-side
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(6);
+  const [orderBy, setOrderBy] = useState('id'); // servidor: id | nombre | codigo | created_at | updated_at (o lo que habilitaste)
+  const [orderDir, setOrderDir] = useState('ASC'); // ASC | DESC
+  const [meta, setMeta] = useState(null);
+
   const { userLevel } = useAuth();
   const [productos, setProductos] = useState([]);
   const [search, setSearch] = useState('');
@@ -87,54 +94,156 @@ const ProductosGet = () => {
   const fetchData = async () => {
     try {
       const [resProd, resCat] = await Promise.all([
-        axios.get('http://localhost:8080/productos'),
-        axios.get('http://localhost:8080/categorias')
+        axios.get(`${BASE_URL}/productos`, {
+          params: {
+            page,
+            limit,
+            // 🔎 filtro servidor:
+            q: debouncedQ || undefined,
+            estado: estadoFiltro !== 'todos' ? estadoFiltro : undefined,
+            categoriaId: categoriaFiltro || undefined,
+            // si tenés proveedor seleccionado:
+            // proveedorId: proveedorIdSel || undefined,
+
+            // 🔁 orden servidor:
+            orderBy,
+            orderDir
+          }
+        }),
+        axios.get(`${BASE_URL}/categorias`)
       ]);
-      setProductos(resProd.data);
-      setCategorias(resCat.data);
+
+      if (Array.isArray(resProd.data)) {
+        setMeta(null);
+      } else {
+        setMeta(resProd.data?.meta || null);
+      }
+
+      // Compat: si /productos devuelve array plano
+      if (Array.isArray(resProd.data)) {
+        setProductos(resProd.data);
+        // Cuando el backend devuelve array plano, no hay meta:
+        // todo el filtrado sigue siendo en el cliente (como ya lo tenés más abajo).
+      } else {
+        setProductos(resProd.data?.data || []);
+      }
+
+      setCategorias(
+        Array.isArray(resCat.data) ? resCat.data : resCat.data?.data || []
+      );
     } catch (error) {
       console.error('Error al cargar productos o categorías:', error);
     }
   };
 
+  // 🔎 Query server-side a partir de tu search (simple “debounce” lógico)
+  const debouncedQ = useMemo(() => search.trim(), [search]);
+
   useEffect(() => {
     fetchData();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    page,
+    limit,
+    orderBy,
+    orderDir,
+    debouncedQ,
+    estadoFiltro,
+    categoriaFiltro /*, proveedorIdSel*/
+  ]);
 
-  const filtered = productos
-    .filter((p) => {
-      const searchLower = search.toLowerCase();
+  // Si HAY meta => el backend ya filtró/paginó. Renderizamos tal cual `productos`.
+  // Si NO hay meta (array plano por compat) => usamos tu filtrado/orden/paginación cliente.
+  const clientFiltered = useMemo(() => {
+    if (meta) return productos;
+    const searchLower = search.toLowerCase();
 
-      // Campos a buscar (solo strings)
-      const campos = [
-        p.nombre,
-        p.descripcion,
-        p.categoria?.nombre // <- extraemos nombre de la categoría
-      ];
+    const base = productos
+      .filter((p) => {
+        const campos = [p.nombre, p.descripcion, p.categoria?.nombre];
+        return campos.some(
+          (campo) =>
+            typeof campo === 'string' &&
+            campo.toLowerCase().includes(searchLower)
+        );
+      })
+      .filter((p) =>
+        estadoFiltro === 'todos' ? true : p.estado === estadoFiltro
+      )
+      .filter((p) =>
+        categoriaFiltro === null
+          ? true
+          : p.categoria_id === parseInt(categoriaFiltro)
+      )
+      .filter((p) => {
+        const precio = parseFloat(p.precio);
+        const min = parseFloat(precioMin) || 0;
+        const max = parseFloat(precioMax) || Infinity;
+        return precio >= min && precio <= max;
+      })
+      .sort((a, b) => {
+        // este orden solo aplica en modo cliente
+        if (ordenCampo === 'precio') return (a.precio || 0) - (b.precio || 0);
+        return (a.nombre || '').localeCompare(b.nombre || '');
+      });
 
-      return campos.some(
-        (campo) =>
-          typeof campo === 'string' && campo.toLowerCase().includes(searchLower)
-      );
-    })
-    .filter((p) =>
-      estadoFiltro === 'todos' ? true : p.estado === estadoFiltro
-    )
-    .filter((p) =>
-      categoriaFiltro === null
-        ? true
-        : p.categoria_id === parseInt(categoriaFiltro)
-    )
-    .filter((p) => {
-      const precio = parseFloat(p.precio);
-      const min = parseFloat(precioMin) || 0;
-      const max = parseFloat(precioMax) || Infinity;
-      return precio >= min && precio <= max;
-    })
-    .sort((a, b) => {
-      if (ordenCampo === 'precio') return a.precio - b.precio;
-      return a.nombre.localeCompare(b.nombre);
-    });
+    // si no hay meta, también “paginamos” en cliente para que la UI sea consistente
+    const start = (page - 1) * limit;
+    const end = start + limit;
+    return base.slice(start, end);
+  }, [
+    meta,
+    productos,
+    search,
+    estadoFiltro,
+    categoriaFiltro,
+    precioMin,
+    precioMax,
+    ordenCampo,
+    page,
+    limit
+  ]);
+
+  // filas a renderizar
+  const rows = meta ? productos : clientFiltered;
+
+  // totales/páginas/estado de flechas
+  const total =
+    meta?.total ??
+    (meta
+      ? 0
+      : (() => {
+          // si no hay meta, necesitamos el total “antes del slice”
+          const q = search.toLowerCase();
+          const base = productos
+            .filter((p) => {
+              const campos = [p.nombre, p.descripcion, p.categoria?.nombre];
+              return campos.some(
+                (campo) =>
+                  typeof campo === 'string' && campo.toLowerCase().includes(q)
+              );
+            })
+            .filter((p) =>
+              estadoFiltro === 'todos' ? true : p.estado === estadoFiltro
+            )
+            .filter((p) =>
+              categoriaFiltro === null
+                ? true
+                : p.categoria_id === parseInt(categoriaFiltro)
+            )
+            .filter((p) => {
+              const precio = parseFloat(p.precio);
+              const min = parseFloat(precioMin) || 0;
+              const max = parseFloat(precioMax) || Infinity;
+              return precio >= min && precio <= max;
+            });
+          return base.length;
+        })());
+
+  const totalPages = meta?.totalPages ?? Math.max(Math.ceil(total / limit), 1);
+  const currPage = meta?.page ?? page;
+  const hasPrev = meta?.hasPrev ?? currPage > 1;
+  const hasNext = meta?.hasNext ?? currPage < totalPages;
 
   const openModal = (producto = null) => {
     if (producto) {
@@ -366,7 +475,7 @@ const ProductosGet = () => {
               />
 
               <button
-                onClick={() => exportarProductosAExcel(filtered)}
+                onClick={() => exportarProductosAExcel(rows)}
                 className="w-full sm:w-auto bg-cyan-600 hover:bg-cyan-700 px-4 py-2 rounded-xl font-semibold flex items-center gap-2 text-white"
               >
                 <FaDownload /> Exportar Excel
@@ -439,8 +548,123 @@ const ProductosGet = () => {
           />
         </div>
 
+        {/* Info + paginación */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+          <div className="text-white/80 text-xs sm:text-sm">
+            Total: <b>{total}</b> · Página <b>{currPage}</b> de{' '}
+            <b>{totalPages}</b>
+          </div>
+          <div className="-mx-2 sm:mx-0">
+            <div className="overflow-x-auto no-scrollbar px-2 sm:px-0">
+              <div className="inline-flex items-center whitespace-nowrap gap-2">
+                <button
+                  className="px-3 py-2 rounded-lg bg-gray-700 text-white disabled:opacity-40"
+                  onClick={() => setPage(1)}
+                  disabled={!hasPrev}
+                >
+                  «
+                </button>
+                <button
+                  className="px-3 py-2 rounded-lg bg-gray-700 text-white disabled:opacity-40"
+                  onClick={() => setPage((p) => Math.max(p - 1, 1))}
+                  disabled={!hasPrev}
+                >
+                  ‹
+                </button>
+
+                <div className="flex flex-wrap gap-2 max-w-[80vw]">
+                  {Array.from({ length: totalPages })
+                    .slice(
+                      Math.max(0, currPage - 3),
+                      Math.max(0, currPage - 3) + 6
+                    )
+                    .map((_, idx) => {
+                      const start = Math.max(1, currPage - 2);
+                      const num = start + idx;
+                      if (num > totalPages) return null;
+                      const active = num === currPage;
+                      return (
+                        <button
+                          key={num}
+                          onClick={() => setPage(num)}
+                          className={`px-3 py-2 rounded-lg border ${
+                            active
+                              ? 'bg-rose-600 border-rose-400'
+                              : 'bg-gray-800 border-gray-700 hover:bg-gray-700'
+                          }`}
+                          aria-current={active ? 'page' : undefined}
+                        >
+                          {num}
+                        </button>
+                      );
+                    })}
+                </div>
+
+                <button
+                  className="px-3 py-2 rounded-lg bg-gray-700 text-white disabled:opacity-40"
+                  onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
+                  disabled={!hasNext}
+                >
+                  ›
+                </button>
+                <button
+                  className="px-3 py-2 rounded-lg bg-gray-700 text-white disabled:opacity-40"
+                  onClick={() => setPage(totalPages)}
+                  disabled={!hasNext}
+                >
+                  »
+                </button>
+
+                {/* selector de límite */}
+                <select
+                  value={limit}
+                  onChange={(e) => {
+                    setLimit(Number(e.target.value));
+                    setPage(1);
+                  }}
+                  className="ml-3 px-3 py-2 rounded-lg bg-gray-800 border border-gray-700"
+                  aria-label="Items por página"
+                >
+                  <option value={6}>6</option>
+                  <option value={12}>12</option>
+                  <option value={24}>24</option>
+                  <option value={48}>48</option>
+                </select>
+
+                {/* orden servidor opcional */}
+                <select
+                  value={orderBy}
+                  onChange={(e) => {
+                    setOrderBy(e.target.value);
+                    setPage(1);
+                  }}
+                  className="ml-2 px-3 py-2 rounded-lg bg-gray-800 border border-gray-700"
+                >
+                  <option value="id">ID</option>
+                  <option value="nombre">Nombre</option>
+                  <option value="codigo">Código</option>
+                  {/* <option value="created_at">Creación</option>
+                  <option value="updated_at">Actualización</option> */}
+                </select>
+                <select
+                  value={orderDir}
+                  onChange={(e) => {
+                    setOrderDir(e.target.value);
+                    setPage(1);
+                  }}
+                  className="px-3 py-2 rounded-lg bg-gray-800 border border-gray-700"
+                >
+                  <option value="ASC">Ascendente</option>
+                  <option value="DESC">Descendente</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {filtered.map((p) => (
+          {rows.map((p) => (
             <motion.div
               key={p.id}
               layout
@@ -564,6 +788,8 @@ const ProductosGet = () => {
             </motion.div>
           ))}
         </div>
+
+        
 
         <Modal
           isOpen={modalOpen}
