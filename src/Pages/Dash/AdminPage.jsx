@@ -91,6 +91,30 @@ const AdminPage = () => {
                 <button className="btnstaff">Vendedores</button>
               </Link>
             </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.6 }}
+              className="bg-white font-bignoodle w-[250px] h-[100px] text-[20px] lg:w-[400px] lg:h-[150px] lg:text-[30px] mx-auto flex justify-center items-center rounded-tr-xl rounded-bl-xl"
+            >
+              {' '}
+              <Link to="/dashboard/cheques">
+                <button className="btnstaff">cheques</button>
+              </Link>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.6 }}
+              className="bg-white font-bignoodle w-[250px] h-[100px] text-[20px] lg:w-[400px] lg:h-[150px] lg:text-[30px] mx-auto flex justify-center items-center rounded-tr-xl rounded-bl-xl"
+            >
+              {' '}
+              <Link to="/dashboard/bancos">
+                <button className="btnstaff">bancos</button>
+              </Link>
+            </motion.div>
           </div>
         </div>
       </section>
