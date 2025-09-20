@@ -17,7 +17,8 @@ import {
   FaPrint,
   FaCopy,
   FaTicketAlt,
-  FaTimes
+  FaTimes,
+  FaCog
 } from 'react-icons/fa';
 import ButtonBack from '../../Components/ButtonBack.jsx';
 import ParticlesBackground from '../../Components/ParticlesBackground.jsx';
@@ -1174,53 +1175,95 @@ const StockGet = () => {
                 <div className="flex gap-2">
                   {userLevel === 'socio' && (
                     <>
-                      {/* Botón Imprimir TICKET por grupo (30×15) */}
-                      <button
-                        type="button"
-                        onClick={() => imprimirTicketGrupo(group)}
-                        disabled={
-                          descargandoTicket || !hayImprimiblesEnGrupo(group)
-                        }
-                        className={`mt-2 mb-2 px-3 py-1 rounded-lg text-white text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60
-    ${
-      hayImprimiblesEnGrupo(group)
-        ? 'bg-orange-500 hover:bg-orange-400'
-        : 'bg-white/20 cursor-not-allowed'
-    }`}
-                        title={
-                          hayImprimiblesEnGrupo(group)
-                            ? 'Imprimir TICKET 30×15 del grupo'
-                            : 'Sin stock para imprimir'
-                        }
-                      >
-                        <FaTicketAlt className="text-orange-200" />
-                        {descargandoTicket ? '' : ''}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => abrirDuplicar(group)}
-                        className="mt-2 mb-2 px-3 py-1 bg-blue-600 hover:bg-blue-500 rounded-lg text-white text-sm font-semibold flex items-center justify-center gap-2"
-                        title="Duplicar producto"
-                      >
-                        <FaCopy className="text-blue-200" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          openModal(null, group); // null para item, group como segundo argumento
-                        }}
-                        className="mt-2 mb-2 px-3 py-1 bg-yellow-500 hover:bg-yellow-400 rounded-lg text-white text-sm font-semibold flex items-center justify-center gap-2"
-                      >
-                        <FaEdit />
-                      </button>
-                      <button
-                        onClick={() => {
-                          setGrupoAEliminar(group);
-                          setOpenConfirm(true);
-                        }}
-                        className="mt-2 mb-2 px-3 py-1 bg-red-600 hover:bg-red-500 rounded-lg text-white text-sm font-semibold flex items-center justify-center gap-2"
-                      >
-                        <FaTrash />
-                      </button>
+                      {/* Imprimir */}
+                      <div className="relative group">
+                        <button
+                          type="button"
+                          onClick={() => imprimirTicketGrupo(group)}
+                          disabled={
+                            descargandoTicket || !hayImprimiblesEnGrupo(group)
+                          }
+                          className={`mt-2 mb-2 w-9 h-9 rounded-lg text-white flex items-center justify-center disabled:opacity-60
+            ${
+              hayImprimiblesEnGrupo(group)
+                ? 'bg-orange-500 hover:bg-orange-400'
+                : 'bg-orange-500/50 cursor-not-allowed'
+            }`}
+                          aria-label="Imprimir código de barras"
+                        >
+                          <FaTicketAlt className="text-white/90" />
+                        </button>
+                        <span
+                          className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full
+                     bg-gray-900 text-white text-xs px-2 py-1 rounded shadow whitespace-nowrap
+                     opacity-0 group-hover:opacity-100 transition-none z-[2000]"
+                        >
+                          Imprimir código de barras
+                        </span>
+                      </div>
+
+                      {/* Duplicar */}
+                      <div className="relative group">
+                        <button
+                          type="button"
+                          onClick={() => abrirDuplicar(group)}
+                          className="mt-2 mb-2 w-9 h-9 bg-blue-600 hover:bg-blue-500 rounded-lg text-white flex items-center justify-center"
+                          aria-label="Duplicar"
+                        >
+                          <FaCopy className="text-white/90" />
+                        </button>
+                        <span className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full bg-gray-900 text-white text-xs px-2 py-1 rounded shadow whitespace-nowrap opacity-0 group-hover:opacity-100 transition-none z-[2000]">
+                          Duplicar
+                        </span>
+                      </div>
+
+                      {/* Editar */}
+                      <div className="relative group">
+                        <button
+                          type="button"
+                          onClick={() => openModal(group.items?.[0], null)}
+                          className="mt-2 mb-2 w-9 h-9 bg-yellow-500 hover:bg-yellow-400 rounded-lg text-white flex items-center justify-center"
+                          aria-label="Editar"
+                        >
+                          <FaEdit className="text-white/90" />
+                        </button>
+                        <span className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full bg-gray-900 text-white text-xs px-2 py-1 rounded shadow whitespace-nowrap opacity-0 group-hover:opacity-100 transition-none z-[2000]">
+                          Editar
+                        </span>
+                      </div>
+
+                      {/* Ajustar grupo (ruedita) */}
+                      <div className="relative group">
+                        <button
+                          type="button"
+                          onClick={() => openModal(null, group)}
+                          className="mt-2 mb-2 w-9 h-9 bg-amber-600 hover:bg-amber-500 rounded-lg text-white flex items-center justify-center"
+                          aria-label="Ajustar grupo"
+                        >
+                          <FaCog className="text-white/90" />
+                        </button>
+                        <span className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full bg-gray-900 text-white text-xs px-2 py-1 rounded shadow whitespace-nowrap opacity-0 group-hover:opacity-100 transition-none z-[2000]">
+                          Ajustar grupo
+                        </span>
+                      </div>
+
+                      {/* Eliminar */}
+                      <div className="relative group">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setGrupoAEliminar(group);
+                            setOpenConfirm(true);
+                          }}
+                          className="mt-2 mb-2 w-9 h-9 bg-red-600 hover:bg-red-500 rounded-lg text-white flex items-center justify-center"
+                          aria-label="Eliminar"
+                        >
+                          <FaTrash className="text-white/90" />
+                        </button>
+                        <span className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full bg-gray-900 text-white text-xs px-2 py-1 rounded shadow whitespace-nowrap opacity-0 group-hover:opacity-100 transition-none z-[2000]">
+                          Eliminar
+                        </span>
+                      </div>
                     </>
                   )}
                 </div>
