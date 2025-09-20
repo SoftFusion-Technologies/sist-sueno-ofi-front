@@ -29,6 +29,7 @@ import { ModalFeedback } from '../Ventas/Config/ModalFeedback.jsx';
 import Barcode from 'react-barcode';
 import { getUserId } from '../../utils/authUtils';
 import SearchableSelect from './Components/SearchableSelect.jsx';
+import LocalesCantidadPicker from './Components/LocalesCantidadPicker.jsx';
 
 Modal.setAppElement('#root');
 
@@ -62,18 +63,30 @@ const StockGet = () => {
   const { userLevel } = useAuth();
   const UMBRAL_STOCK_BAJO = 5;
   const [stock, setStock] = useState([]);
+  // const [formData, setFormData] = useState({
+  //   producto_id: '',
+  //   local_id: '',
+  //   locales: [], // ← nuevo: varios locales
+  //   lugar_id: '',
+  //   estado_id: '',
+  //   cantidad: 0,
+  //   en_exhibicion: true,
+  //   observaciones: '',
+  //   codigo_sku: '',
+  //   localesCant: [],
+  //   modo: 'reemplazar'
+  // });
+
   const [formData, setFormData] = useState({
     producto_id: '',
-    local_id: '',
-    locales: [], // ← nuevo: varios locales
-    lugar_id: '',
-    estado_id: '',
-    cantidad: 0,
     en_exhibicion: true,
     observaciones: '',
-    codigo_sku: ''
+    codigo_sku: '',
+    // 🔹 filas [{ local_id, lugar_id, estado_id, cantidad }]
+    localesCant: [],
+    // 🔹 modo de actualización (reemplazar vs sumar)
+    modo: 'reemplazar'
   });
-
   const [modalOpen, setModalOpen] = useState(false);
   // const [modalTallesOpen, setModalTallesOpen] = useState(false);
   // const [tallesGroupView, setTallesGroupView] = useState(null); // El grupo actual
@@ -230,39 +243,58 @@ const StockGet = () => {
 
   const openModal = (item = null, group = null) => {
     if (item) {
+      // 🟣 EDITAR una fila existente
       setEditId(item.id);
-      setFormData({ ...item, locales: [] });
+      setFormData({
+        producto_id: item.producto_id ?? '',
+        en_exhibicion: !!item.en_exhibicion,
+        observaciones: item.observaciones || '',
+        codigo_sku: item.codigo_sku || '',
+        modo: 'reemplazar',
+        localesCant: [
+          {
+            local_id: Number(item.local_id),
+            lugar_id: Number(item.lugar_id),
+            estado_id: Number(item.estado_id),
+            cantidad: Number(item.cantidad) || 0
+          }
+        ]
+      });
       setGrupoOriginal(null);
       setGrupoEditando(null);
     } else if (group) {
-      const primerItem = group.items[0]; // ✅ obtenemos el primer item real
-      setEditId(primerItem.id); // ✅ usamos su ID para modo edición
-
+      // 🔵 CARGAR GRUPO (si venís de una vista agrupada)
+      const items = Array.isArray(group.items) ? group.items : [];
+      setEditId(null); // en grupo hacemos alta/ajuste múltiple
       setFormData({
-        ...primerItem
+        producto_id: Number(group.producto_id) || '',
+        en_exhibicion: !!group.en_exhibicion,
+        observaciones: group.observaciones || '',
+        codigo_sku: group.codigo_sku || '',
+        modo: 'reemplazar',
+        localesCant: items.map((it) => ({
+          local_id: Number(it.local_id),
+          lugar_id: Number(it.lugar_id),
+          estado_id: Number(it.estado_id),
+          cantidad: Number(it.cantidad) || 0
+        }))
       });
-
       setGrupoOriginal({
         producto_id: group.producto_id,
-        local_id: group.local_id,
-        lugar_id: group.lugar_id,
-        estado_id: group.estado_id,
         en_exhibicion: group.en_exhibicion,
         observaciones: group.observaciones
       });
       setGrupoEditando(group);
     } else {
+      // 🟢 NUEVO
       setEditId(null);
       setFormData({
         producto_id: '',
-        local_id: '',
-        lugar_id: '',
-        estado_id: '',
         en_exhibicion: true,
-        codigo_sku: '',
-        locales: [],
         observaciones: '',
-        cantidad: ''
+        codigo_sku: '',
+        modo: 'reemplazar',
+        localesCant: [] // ← todo se carga acá
       });
       setGrupoOriginal(null);
       setGrupoEditando(null);
@@ -274,115 +306,108 @@ const StockGet = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const cantidadNumerica = Number(formData.cantidad);
+    const rows = Array.isArray(formData.localesCant)
+      ? formData.localesCant
+      : [];
+    const isMulti = rows.length > 1;
+    const hasAtLeastOne = rows.length > 0;
 
-    // Unificar local_id (select simple) + locales[] (multiselect)
-    const localesUnicos = [
-      Number(formData.local_id) || null,
-      ...(Array.isArray(formData.locales) ? formData.locales.map(Number) : [])
-    ].filter(Boolean);
-    const localesDedupe = [...new Set(localesUnicos)];
+    // ✅ Validaciones base
+    if (!formData.producto_id) {
+      return feedback('Seleccioná un producto.', 'info');
+    }
+    if (!hasAtLeastOne) {
+      return feedback('Agregá al menos un local con datos.', 'info');
+    }
 
-    // ✅ Validaciones (sin talles)
-    if (
-      !formData.producto_id ||
-      !formData.lugar_id ||
-      !formData.estado_id ||
-      isNaN(cantidadNumerica) ||
-      cantidadNumerica < 0 ||
-      (editId ? !formData.local_id : localesDedupe.length === 0)
-    ) {
-      setModalFeedbackMsg(
-        editId
-          ? 'Completa producto, local, lugar, estado y una cantidad válida.'
-          : 'Completa producto, lugar, estado, cantidad y seleccioná al menos un local.'
+    // Validación por fila (local/lugar/estado/cantidad)
+    const invalid = rows.find(
+      (r) =>
+        !Number(r.local_id) ||
+        !Number(r.lugar_id) ||
+        !Number(r.estado_id) ||
+        Number(r.cantidad) < 0 ||
+        isNaN(Number(r.cantidad))
+    );
+    if (invalid) {
+      return feedback(
+        'Revisá que cada fila tenga Local, Lugar, Estado y una cantidad válida (≥ 0).',
+        'info'
       );
-      setModalFeedbackType('info');
-      setModalFeedbackOpen(true);
-      return;
     }
 
     const usuario_log_id = getUserId();
 
-    // Base del payload (sin talle)
-    const basePayload = {
-      producto_id: Number(formData.producto_id),
-      lugar_id: Number(formData.lugar_id),
-      estado_id: Number(formData.estado_id),
-      en_exhibicion: !!formData.en_exhibicion, // si tu backend usa en_exhibicion, ajustalo aquí
-      cantidad: cantidadNumerica,
-      usuario_log_id
-    };
-
-    // 🔄 EDICIÓN (una fila de stock)
+    // 🔄 EDICIÓN (una fila existente): usamos la PRIMERA fila de localesCant
     if (editId) {
+      const r0 = rows[0];
       try {
         const payload = {
-          ...basePayload,
-          local_id: Number(formData.local_id)
+          producto_id: Number(formData.producto_id),
+          local_id: Number(r0.local_id),
+          lugar_id: Number(r0.lugar_id),
+          estado_id: Number(r0.estado_id),
+          en_exhibicion: !!formData.en_exhibicion,
+          cantidad: Number(r0.cantidad) || 0,
+          usuario_log_id,
+          reemplazar: (formData.modo || 'reemplazar') === 'reemplazar'
         };
         await axios.put(`http://localhost:8080/stock/${editId}`, payload);
-        fetchAll();
-        setModalOpen(false);
-        setModalFeedbackMsg('Stock actualizado correctamente.');
-        setModalFeedbackType('success');
-        setModalFeedbackOpen(true);
+        postOk('Stock actualizado correctamente.');
       } catch (err) {
-        setModalFeedbackMsg(
-          err.response?.data?.mensajeError ||
-            err.response?.data?.message ||
-            err.message ||
-            'Error inesperado al editar el stock'
-        );
-        setModalFeedbackType('error');
-        setModalFeedbackOpen(true);
-        console.error('Error al editar stock:', err);
+        postErr(err, 'Error inesperado al editar el stock');
       }
       return;
     }
 
-    // ➕ ALTA (una o varias filas según locales seleccionados)
+    // ➕ ALTA / AJUSTE (múltiple o single via localesCant[0])
     try {
-      if (localesDedupe.length === 1) {
-        // Un solo local → un POST
-        const payload = {
-          ...basePayload,
-          local_id: localesDedupe[0]
-        };
-        await axios.post(`http://localhost:8080/stock`, payload);
-      } else {
-        // Varios locales → un POST por local
-        await Promise.all(
-          localesDedupe.map((locId) =>
-            axios.post(`http://localhost:8080/stock`, {
-              ...basePayload,
-              local_id: locId
-            })
-          )
-        );
-      }
+      const payload = {
+        producto_id: Number(formData.producto_id),
+        en_exhibicion: !!formData.en_exhibicion,
+        codigo_sku: formData.codigo_sku || undefined,
+        usuario_log_id,
+        reemplazar: (formData.modo || 'reemplazar') === 'reemplazar',
+        localesCant: rows.map((r) => ({
+          local_id: Number(r.local_id),
+          lugar_id: Number(r.lugar_id),
+          estado_id: Number(r.estado_id),
+          cantidad: Number(r.cantidad) || 0
+        }))
+      };
 
-      fetchAll();
-      setModalOpen(false);
-      setModalFeedbackMsg(
-        localesDedupe.length > 1
-          ? 'Stock creado en los locales seleccionados.'
+      await axios.post(`http://localhost:8080/stock`, payload);
+      postOk(
+        isMulti
+          ? 'Stock actualizado en múltiples locales.'
           : 'Stock creado correctamente.'
       );
-      setModalFeedbackType('success');
-      setModalFeedbackOpen(true);
     } catch (err) {
-      setModalFeedbackMsg(
-        err.response?.data?.mensajeError ||
-          err.response?.data?.message ||
-          err.message ||
-          'Error inesperado al crear el stock'
-      );
-      setModalFeedbackType('error');
-      setModalFeedbackOpen(true);
-      console.error('Error al crear stock:', err);
+      postErr(err, 'Error inesperado al crear/ajustar el stock');
     }
   };
+
+  // helpers feedback
+  function feedback(msg, type) {
+    setModalFeedbackMsg(msg);
+    setModalFeedbackType(type);
+    setModalFeedbackOpen(true);
+  }
+  function postOk(msg) {
+    fetchAll();
+    setModalOpen(false);
+    feedback(msg, 'success');
+  }
+  function postErr(err, fallback) {
+    feedback(
+      err?.response?.data?.mensajeError ||
+        err?.response?.data?.message ||
+        err?.message ||
+        fallback,
+      'error'
+    );
+    console.error(err);
+  }
 
   const handleDelete = async (id) => {
     const confirmado = window.confirm(
@@ -1207,281 +1232,162 @@ const StockGet = () => {
         <Modal
           isOpen={modalOpen}
           onRequestClose={() => setModalOpen(false)}
-          overlayClassName="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50"
-          className="bg-white rounded-2xl p-8 shadow-2xl border-l-4 border-cyan-500 max-w-2xl w-full mx-4"
+          overlayClassName="fixed inset-0 z-50 grid place-items-center bg-black/50 backdrop-blur-sm p-4"
+          className="relative w-full max-w-3xl bg-white rounded-2xl shadow-2xl border border-cyan-100 overflow-hidden"
         >
-          <h2 className="text-2xl font-bold mb-4 text-cyan-600">
-            {editId ? 'Editar Stock' : 'Nuevo Stock'}
-          </h2>
+          {/* Header sticky */}
+          <header className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-gray-200 px-5 py-4">
+            <h2 className="text-xl md:text-2xl font-bold text-cyan-600">
+              {editId ? 'EDITAR STOCK' : 'NUEVO STOCK'}
+            </h2>
+          </header>
 
-          <form onSubmit={handleSubmit} className="space-y-4 text-gray-800">
-            {/* Producto */}
-            <SearchableSelect
-              label="Producto"
-              items={productos}
-              value={formData.producto_id}
-              onChange={(id) =>
-                setFormData((fd) => ({ ...fd, producto_id: Number(id) || '' }))
-              }
-              required
-              placeholder="Buscar o seleccionar producto…"
-            />
-
-            {/* Local (single). Si eligen multi-locales más abajo, este deja de ser requerido */}
-            <SearchableSelect
-              label="Local"
-              items={locales}
-              value={formData.local_id}
-              onChange={(id) =>
-                setFormData((fd) => ({ ...fd, local_id: Number(id) || '' }))
-              }
-              required={!(formData.locales?.length > 0)}
-              placeholder="Buscar local…"
-            />
-
-            {/* Lugar */}
-            <SearchableSelect
-              label="Lugar"
-              items={lugares}
-              value={formData.lugar_id}
-              onChange={(id) =>
-                setFormData((fd) => ({ ...fd, lugar_id: Number(id) || '' }))
-              }
-              required
-              placeholder="Buscar lugar…"
-            />
-
-            {/* Estado */}
-            <SearchableSelect
-              label="Estado"
-              items={estados}
-              value={formData.estado_id}
-              onChange={(id) =>
-                setFormData((fd) => ({ ...fd, estado_id: Number(id) || '' }))
-              }
-              required
-              placeholder="Buscar estado…"
-            />
-
-            {/* 🔹 NUEVO: selección múltiple de locales (solo en alta/edición de grupo) */}
-            {!editId && (
-              <div className="relative">
-                <label className="block font-semibold mb-1">
-                  Locales (múltiple)
-                </label>
-
-                {/* Botón que abre el picker */}
-                <button
-                  type="button"
-                  onClick={() => setShowLocalesPicker((v) => !v)}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-300 bg-white flex items-center justify-between"
-                >
-                  <span className="text-left truncate">
-                    {formData.locales?.length
-                      ? `Seleccionados: ${formData.locales.length}`
-                      : 'Seleccionar uno o más…'}
-                  </span>
-                  {/* <FaChevronDown className="opacity-60" /> */}
-                </button>
-
-                {/* Chips de selección actual */}
-                {formData.locales?.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {formData.locales
-                      .map((id) => locales.find((l) => l.id === id))
-                      .filter(Boolean)
-                      .map((l) => (
-                        <span
-                          key={l.id}
-                          className="inline-flex items-center gap-2 px-2 py-1 rounded-full bg-cyan-50 text-cyan-700 border border-cyan-200 text-xs"
-                        >
-                          {l.nombre}
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setFormData((fd) => ({
-                                ...fd,
-                                locales: fd.locales.filter((x) => x !== l.id)
-                              }))
-                            }
-                            className="hover:text-cyan-900"
-                            title="Quitar"
-                          >
-                            {/* <FaTimes /> */}×
-                          </button>
-                        </span>
-                      ))}
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setFormData((fd) => ({ ...fd, locales: [] }))
-                      }
-                      className="text-xs text-gray-600 underline"
-                    >
-                      Limpiar
-                    </button>
-                  </div>
-                )}
-
-                {/* Popover */}
-                {showLocalesPicker && (
-                  <div className="absolute z-50 mt-2 w-full max-h-72 overflow-auto bg-white border border-gray-200 rounded-xl shadow-xl p-2">
-                    {/* Buscador + acciones rápidas */}
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="flex-1 relative">
-                        {/* <FaSearch className="absolute left-2 top-2.5 text-gray-400" /> */}
-                        <input
-                          type="text"
-                          value={localesQuery}
-                          onChange={(e) => setLocalesQuery(e.target.value)}
-                          placeholder="Buscar local…"
-                          className="w-full pl-3 pr-3 py-2 rounded-lg border border-gray-300"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setFormData((fd) => ({
-                            ...fd,
-                            locales: locales
-                              .filter((l) =>
-                                l.nombre
-                                  .toLowerCase()
-                                  .includes(localesQuery.toLowerCase())
-                              )
-                              .map((l) => l.id)
-                          }))
-                        }
-                        className="text-xs px-2 py-1 rounded-md border border-gray-300 hover:bg-gray-50"
-                        title="Seleccionar todos (filtrados)"
-                      >
-                        Seleccionar todos
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setFormData((fd) => ({ ...fd, locales: [] }))
-                        }
-                        className="text-xs px-2 py-1 rounded-md border border-gray-300 hover:bg-gray-50"
-                      >
-                        Limpiar
-                      </button>
-                    </div>
-
-                    {/* Lista con checkboxes */}
-                    <div className="space-y-1">
-                      {locales
-                        .filter((l) =>
-                          l.nombre
-                            .toLowerCase()
-                            .includes(localesQuery.toLowerCase())
-                        )
-                        .map((l) => {
-                          const checked = formData.locales.includes(l.id);
-                          return (
-                            <label
-                              key={l.id}
-                              className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-50 cursor-pointer"
-                            >
-                              <input
-                                type="checkbox"
-                                className="h-4 w-4"
-                                checked={checked}
-                                onChange={(e) => {
-                                  setFormData((fd) => ({
-                                    ...fd,
-                                    locales: e.target.checked
-                                      ? [...new Set([...fd.locales, l.id])]
-                                      : fd.locales.filter((id) => id !== l.id)
-                                  }));
-                                }}
-                              />
-                              <span className="text-sm">{l.nombre}</span>
-                              {checked && (
-                                <span className="ml-auto text-xs text-cyan-700">
-                                  ✓
-                                </span>
-                              )}
-                            </label>
-                          );
-                        })}
-                    </div>
-
-                    <div className="mt-2 flex justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setShowLocalesPicker(false)}
-                        className="px-3 py-1 text-sm rounded-md border border-gray-300 hover:bg-gray-50"
-                      >
-                        Cerrar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowLocalesPicker(false)}
-                        className="px-3 py-1 text-sm rounded-md bg-cyan-600 text-white hover:bg-cyan-500"
-                      >
-                        Aplicar
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                <p className="text-xs text-gray-500 mt-1">
-                  Si seleccionás al menos un local acá, ignoramos el campo
-                  “Local” de arriba.
-                </p>
-              </div>
-            )}
-            {editId && (
-              <div>
-                <label className="block text-sm font-semibold text-gray-600">
-                  Código SKU (Generado automáticamente)
-                </label>
-                <input
-                  type="text"
-                  value={formData.codigo_sku || ''}
-                  readOnly
-                  className="w-full px-4 py-2 rounded-lg bg-gray-100 border border-gray-300 text-gray-600 cursor-not-allowed"
-                />
-              </div>
-            )}
-
-            {/* Cantidad */}
-            <div>
-              <label className="block font-semibold mb-1">Cantidad</label>
-              <input
-                type="number"
-                min="0"
-                value={formData.cantidad}
-                onChange={(e) =>
-                  setFormData({ ...formData, cantidad: Number(e.target.value) })
+          {/* Contenido scrolleable */}
+          <div className="max-h-[80vh] overflow-y-auto px-5 py-4">
+            <form onSubmit={handleSubmit} className="space-y-4 text-gray-800">
+              {/* Producto */}
+              <SearchableSelect
+                label="Producto"
+                items={productos}
+                value={formData.producto_id}
+                onChange={(id) =>
+                  setFormData((fd) => ({
+                    ...fd,
+                    producto_id: Number(id) || ''
+                  }))
                 }
-                className="w-full px-4 py-2 rounded-lg border border-gray-300"
                 required
+                placeholder="Buscar o seleccionar producto…"
               />
-            </div>
 
-            {/* exhibición */}
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={formData.en_exhibicion}
-                onChange={(e) =>
-                  setFormData({ ...formData, en_exhibicion: e.target.checked })
+              {/* Locales + cantidades (limitar alto interno) */}
+              <LocalesCantidadPicker
+                locales={locales || []}
+                lugares={lugares || []}
+                estados={estados || []}
+                value={formData.localesCant || []}
+                onChange={(rows) =>
+                  setFormData((fd) => ({ ...fd, localesCant: rows }))
                 }
+                defaults={{
+                  lugar_id: formData.lugar_id,
+                  estado_id: formData.estado_id
+                }}
+                listClassName="max-h-64 overflow-auto pr-1"
               />
-              <label>En exhibición</label>
-            </div>
 
-            <div className="text-right">
+              {/* Modo */}
+              {/* <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <label className="text-sm text-gray-700">
+                  Modo de actualización:
+                </label>
+                <select
+                  value={formData.modo}
+                  onChange={(e) =>
+                    setFormData((fd) => ({ ...fd, modo: e.target.value }))
+                  }
+                  className="px-3 py-2 border rounded-lg w-full sm:w-auto"
+                >
+                  <option value="reemplazar">
+                    Reemplazar (cantidad exacta)
+                  </option>
+                  <option value="sumar">Sumar (incrementar)</option>
+                </select>
+              </div> */}
+
+              {/* Lugar */}
+              {/* <SearchableSelect
+                label="Lugar"
+                items={lugares}
+                value={formData.lugar_id}
+                onChange={(id) =>
+                  setFormData((fd) => ({ ...fd, lugar_id: Number(id) || '' }))
+                }
+                required
+                placeholder="Buscar lugar…"
+              /> */}
+
+              {/* Estado */}
+              {/* <SearchableSelect
+                label="Estado"
+                items={estados}
+                value={formData.estado_id}
+                onChange={(id) =>
+                  setFormData((fd) => ({ ...fd, estado_id: Number(id) || '' }))
+                }
+                required
+                placeholder="Buscar estado…"
+              /> */}
+
+              {editId && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-600">
+                    Código SKU (Generado automáticamente)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.codigo_sku || ''}
+                    readOnly
+                    className="w-full px-4 py-2 rounded-lg bg-gray-100 border border-gray-300 text-gray-600 cursor-not-allowed"
+                  />
+                </div>
+              )}
+
+              {/* {(formData.localesCant?.length ?? 0) === 0 && (
+                <div>
+                  <label className="block font-semibold mb-1">Cantidad</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.cantidad}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        cantidad: Number(e.target.value)
+                      })
+                    }
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300"
+                    required
+                  />
+                </div>
+              )} */}
+
+              {/* exhibición */}
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={formData.en_exhibicion}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      en_exhibicion: e.target.checked
+                    })
+                  }
+                />
+                <span>En exhibición</span>
+              </label>
+            </form>
+          </div>
+
+          {/* Footer sticky */}
+          <footer className="sticky bottom-0 z-10 bg-white/90 backdrop-blur border-t border-gray-200 px-5 py-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3">
               <button
-                type="submit"
-                className="bg-cyan-500 hover:bg-cyan-600 transition px-6 py-2 text-white font-medium rounded-lg"
+                type="button"
+                onClick={() => setModalOpen(false)}
+                className="px-5 py-2 rounded-lg border border-gray-300 hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                form="__auto" // opcional si usas id de form; si no, deja así y mueve el botón dentro del form
+                onClick={handleSubmit}
+                className="px-6 py-2 rounded-lg bg-cyan-600 text-white hover:bg-cyan-500"
               >
                 {editId ? 'Actualizar' : 'Guardar'}
               </button>
             </div>
-          </form>
+          </footer>
         </Modal>
       </div>
       {/* <ModalError
