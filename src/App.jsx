@@ -70,6 +70,7 @@ import ProveedoresManager from './Pages/Proveedores/ProveedoresManager';
 import AdminPageBancos from './Pages/Bancos/AdminPageBancos';
 import BancosCards from './Pages/Bancos/BancosCards';
 import CuentasCards from './Pages/Bancos/CuentasCards';
+import MovimientosCards from './Pages/Bancos/MovimientosCards';
 
 function AppContent() {
   const { hideLayoutFooter, hideLayoutNav } = useLayoutVisibility();
@@ -437,6 +438,15 @@ function AppContent() {
               <ProtectedRoute>
                 {' '}
                 <CuentasCards />{' '}
+              </ProtectedRoute>
+            }
+          />
+          <Ruta
+            path="/dashboard/bancos/movimientos"
+            element={
+              <ProtectedRoute>
+                {' '}
+                <MovimientosCards />{' '}
               </ProtectedRoute>
             }
           />

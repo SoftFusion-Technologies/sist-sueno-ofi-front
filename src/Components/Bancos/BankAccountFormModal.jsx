@@ -131,7 +131,7 @@ export default function BankAccountFormModal({
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nombre de la cuenta *
+                  Nombre/Titular de la cuenta *
                 </label>
                 <input
                   name="nombre_cuenta"
