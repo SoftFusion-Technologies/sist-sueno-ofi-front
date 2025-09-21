@@ -67,6 +67,9 @@ import Home from './Pages/Home';
 import LogsSistema from './Pages/MetodosGets/LogsSistema';
 import PedidosStockPanel from './Pages/Stock/PedidosStockPanel';
 import ProveedoresManager from './Pages/Proveedores/ProveedoresManager';
+import AdminPageBancos from './Pages/Bancos/AdminPageBancos';
+import BancosCards from './Pages/Bancos/BancosCards';
+import CuentasCards from './Pages/Bancos/CuentasCards';
 
 function AppContent() {
   const { hideLayoutFooter, hideLayoutNav } = useLayoutVisibility();
@@ -409,6 +412,35 @@ function AppContent() {
             }
           />{' '}
           {/* MODULO DENTRO DE PROVEEDORES FINAL BENJAMIN ORELLANA 30 08 25 */}
+          {/* MODULO DENTRO DE BANCOS INICIO BENJAMIN ORELLANA 21 09 25 */}
+          <Ruta
+            path="/dashboard/bancos"
+            element={
+              <ProtectedRoute>
+                {' '}
+                <AdminPageBancos />{' '}
+              </ProtectedRoute>
+            }
+          />
+          <Ruta
+            path="/dashboard/bancos/listado"
+            element={
+              <ProtectedRoute>
+                {' '}
+                <BancosCards />{' '}
+              </ProtectedRoute>
+            }
+          />
+          <Ruta
+            path="/dashboard/bancos/cuentas"
+            element={
+              <ProtectedRoute>
+                {' '}
+                <CuentasCards />{' '}
+              </ProtectedRoute>
+            }
+          />
+          {/* MODULO DENTRO DE BANCOS Final BENJAMIN ORELLANA 21 09 25 */}
           {/* componentes del staff y login FINAL */}
           {/* <Ruta path="/*" element={<NotFound />} /> */}
           {/* 🔁 Ruta no encontrada */}
