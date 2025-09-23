@@ -71,6 +71,9 @@ import AdminPageBancos from './Pages/Bancos/AdminPageBancos';
 import BancosCards from './Pages/Bancos/BancosCards';
 import CuentasCards from './Pages/Bancos/CuentasCards';
 import MovimientosCards from './Pages/Bancos/MovimientosCards';
+import AdminPageCheques from './Pages/Cheques/AdminPageCheques';
+import ChequerasCards from './Pages/Cheques/ChequerasCards';
+import ChequesCards from './Pages/Cheques/ChequesCards';
 
 function AppContent() {
   const { hideLayoutFooter, hideLayoutNav } = useLayoutVisibility();
@@ -451,6 +454,35 @@ function AppContent() {
             }
           />
           {/* MODULO DENTRO DE BANCOS Final BENJAMIN ORELLANA 21 09 25 */}
+          {/* MODULO DENTRO DE CHEQUES Inicio BENJAMIN ORELLANA 21 09 25 */}
+          <Ruta
+            path="/dashboard/cheques"
+            element={
+              <ProtectedRoute>
+                {' '}
+                <AdminPageCheques />{' '}
+              </ProtectedRoute>
+            }
+          />
+          <Ruta
+            path="/dashboard/cheques/chequeras"
+            element={
+              <ProtectedRoute>
+                {' '}
+                <ChequerasCards />{' '}
+              </ProtectedRoute>
+            }
+          />
+          <Ruta
+            path="/dashboard/cheques/cheques"
+            element={
+              <ProtectedRoute>
+                {' '}
+                <ChequesCards />{' '}
+              </ProtectedRoute>
+            }
+          />
+          {/* MODULO DENTRO DE CHEQUES Final BENJAMIN ORELLANA 21 09 25 */}
           {/* componentes del staff y login FINAL */}
           {/* <Ruta path="/*" element={<NotFound />} /> */}
           {/* 🔁 Ruta no encontrada */}

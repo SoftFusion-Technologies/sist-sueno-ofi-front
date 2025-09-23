@@ -95,7 +95,7 @@ export default function MovimientosCards() {
         });
         const arr = Array.isArray(cs) ? cs : cs.data || [];
         setCuentas(arr);
-        if (!cuentaId && arr[0]) setCuentaId(String(arr[0].id));
+        if (!cuentaId && arr[0]) setCuentaId(String(arr[-1].id));
       })().catch(() => {});
       return;
     }

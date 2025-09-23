@@ -51,7 +51,9 @@ const LogsSistema = () => {
     'proveedores',
     'bancos',
     'banco_cuentas',
-    'banco_movimientos'
+    'banco_movimientos',
+    'chequeras',
+    'cheques'
   ];
 
   const [paginaActual, setPaginaActual] = useState(1);
