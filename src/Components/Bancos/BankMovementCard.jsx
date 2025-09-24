@@ -35,7 +35,7 @@ export default function BankMovementCard({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.25 }}
       className="bg-white/90 backdrop-blur-xl border border-white/20 rounded-2xl p-5 shadow-lg
-                 hover:shadow-teal-400/60 hover:scale-[1.02] transition-all duration-300"
+                 hover:shadow-teal-400/60 hover:scale-[1.02] transition-all duration-300 overflow-hidden"
     >
       <div className="flex items-start gap-4">
         <div className="text-3xl text-teal-600 shrink-0">

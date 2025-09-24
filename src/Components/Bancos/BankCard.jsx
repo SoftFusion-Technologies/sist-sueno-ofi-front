@@ -26,7 +26,7 @@ export default function BankCard({ item, onEdit, onToggleActivo, onDelete }) {
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.25 }}
       className="bg-white/90 backdrop-blur-xl border border-white/20 rounded-2xl p-5
-                 shadow-lg hover:shadow-teal-400/60 hover:scale-[1.02] transition-all duration-300"
+                 shadow-lg hover:shadow-teal-400/60 hover:scale-[1.02] transition-all duration-300 overflow-hidden"
     >
       <div className="flex items-start gap-4">
         <div className="text-3xl text-teal-600 shrink-0">
@@ -55,27 +55,34 @@ export default function BankCard({ item, onEdit, onToggleActivo, onDelete }) {
             </div>
           </div>
 
-          <div className="mt-4 flex items-center gap-2">
+          <div className="mt-4 flex flex-wrap gap-2">
             <button
               onClick={() => onEdit(item)}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold
-                         bg-yellow-500 text-white hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-teal-400"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold
+               bg-yellow-500 text-white hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-teal-400"
             >
-              <FaEdit />
+              <FaEdit className="text-base" />
+              <span className="hidden md:inline">Editar</span>
             </button>
+
             <button
               onClick={() => onDelete(item)}
-              className="ml-auto inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold
-                         bg-rose-600 text-white hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-400"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold
+               bg-rose-600 text-white hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-400"
             >
-              <FaTrash />
+              <FaTrash className="text-base" />
+              <span className="hidden md:inline">Eliminar</span>
             </button>
+
             <button
               onClick={() => onToggleActivo(item)}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold
-                         bg-sky-600 text-white hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-400"
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold
+               bg-sky-600 text-white hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-400"
             >
-              {item.activo ? 'Desactivar' : 'Activar'}
+              <FaEdit className="text-base" />
+              <span className="hidden md:inline">
+                {item.activo ? 'Desactivar' : 'Activar'}
+              </span>
             </button>
           </div>
         </div>
