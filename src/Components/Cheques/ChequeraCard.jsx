@@ -54,7 +54,7 @@ export default function ChequeraCard({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.25 }}
       className="bg-white/90 backdrop-blur-xl border border-white/20 rounded-2xl p-5 shadow-lg
-                 hover:shadow-emerald-400/60 hover:scale-[1.02] transition-all duration-300"
+                 hover:shadow-emerald-400/60 hover:scale-[1.02] transition-all duration-300 overflow-hidden"
     >
       <div className="flex items-start gap-4">
         <div className="text-3xl text-emerald-600 shrink-0">
@@ -96,34 +96,38 @@ export default function ChequeraCard({
             </div>
           </div>
 
-          <div className="mt-4 flex items-center gap-2">
+          <div className="mt-4 flex flex-wrap gap-2">
             <button
-              onClick={() => onViewCheques?.(item)} // -> pasás la chequera al padre
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold
-                         bg-indigo-600 text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              onClick={() => onViewCheques?.(item)}
+              className="flex-1 min-w-[120px] inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold
+               bg-indigo-600 text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
             >
-              <FaEye /> Ver
+              <FaEye /> <span className="hidden sm:inline">Ver</span>
             </button>
+
             <button
               onClick={() => onView?.(item)}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold
-                         bg-green-600 text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              className="flex-1 min-w-[120px] inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold
+               bg-green-600 text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-400"
             >
-              <FaRegFolderOpen /> Abrir
+              <FaRegFolderOpen />{' '}
+              <span className="hidden sm:inline">Abrir</span>
             </button>
+
             <button
               onClick={() => onEdit?.(item)}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold
-                         bg-yellow-600 text-white hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              className="flex-1 min-w-[120px] inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold
+               bg-yellow-600 text-white hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-400"
             >
-              <FaEdit />
+              <FaEdit /> <span className="hidden sm:inline">Editar</span>
             </button>
+
             <button
               onClick={() => onDelete?.(item)}
-              className="ml-auto inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold
-                         bg-rose-600 text-white hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-400"
+              className="flex-1 min-w-[120px] inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold
+               bg-rose-600 text-white hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-400"
             >
-              <FaTrash />
+              <FaTrash /> <span className="hidden sm:inline">Eliminar</span>
             </button>
           </div>
         </div>
