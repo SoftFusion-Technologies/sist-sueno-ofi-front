@@ -34,6 +34,7 @@ export default function ChequeraCard({
   bancoNombre,
   cuentaNombre,
   onView,
+  onViewCheques,
   onEdit,
   onDelete
 }) {
@@ -97,7 +98,7 @@ export default function ChequeraCard({
 
           <div className="mt-4 flex items-center gap-2">
             <button
-              onClick={() => onView?.(item)}
+              onClick={() => onViewCheques?.(item)} // -> pasás la chequera al padre
               className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold
                          bg-indigo-600 text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
             >

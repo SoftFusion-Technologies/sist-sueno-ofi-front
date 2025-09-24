@@ -21,7 +21,7 @@ import ChequeraCard from '../../Components/Cheques/ChequeraCard';
 import ChequeraFormModal from '../../Components/Cheques/ChequeraFormModal';
 import ChequeraViewModal from '../../Components/Cheques/ChequeraViewModal';
 import ConfirmDialog from '../../Components/Common/ConfirmDialog';
-
+import ChequeraChequesModal from '../../Components/Cheques/ChequeraChequesModal';
 const useDebounce = (value, ms = 400) => {
   const [deb, setDeb] = useState(value);
   useEffect(() => {
@@ -55,6 +55,9 @@ export default function ChequerasCards() {
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [toDelete, setToDelete] = useState(null);
+
+  const [openCheques, setOpenCheques] = useState(false);
+  const [chequeraSel, setChequeraSel] = useState(null);
 
   // bancos + todas las cuentas
   useEffect(() => {
@@ -177,6 +180,12 @@ export default function ChequerasCards() {
     );
     return row?.cuenta?.banco_id ?? byCuenta?.banco_id ?? row?.banco_id ?? null;
   };
+
+  const handleViewCheques = (chequera) => {
+    setChequeraSel(chequera);
+    setOpenCheques(true);
+  };
+
   const Pager = useMemo(() => {
     if (!meta) return null;
     return (
@@ -333,6 +342,7 @@ export default function ChequerasCards() {
                         setViewing(row);
                         setViewOpen(true);
                       }}
+                      onViewCheques={handleViewCheques}
                       onEdit={(row) => {
                         setEditing(row);
                         setModalOpen(true);
@@ -374,11 +384,16 @@ export default function ChequerasCards() {
         title="Eliminar chequera"
         message={
           toDelete
-            ? `¿Seguro que desea eliminar la chequera #${toDelete.id} (${toDelete.numero_inicio}–${toDelete.numero_fin})?`
+            ? `¿Seguro que desea eliminar la chequera #${toDelete.id} (${toDelete.nro_desde}–${toDelete.nro_hasta})?`
             : ''
         }
         onCancel={() => setConfirmOpen(false)}
         onConfirm={onConfirmDelete}
+      />
+      <ChequeraChequesModal
+        open={openCheques}
+        onClose={() => setOpenCheques(false)}
+        chequeraId={chequeraSel?.id}
       />
     </>
   );

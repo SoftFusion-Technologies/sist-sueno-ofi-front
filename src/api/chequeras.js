@@ -1,6 +1,13 @@
 // src/api/chequeras.js
 import { client, url } from './bancos';
 
+export const listChequesByChequera = async (chequeraId, params = {}) => {
+  const { data } = await client.get(`/chequeras/${chequeraId}/cheques`, {
+    params
+  });
+  return data;
+};
+
 // Filtros soportados (según tu backend): page, limit, q, banco_id, banco_cuenta_id, estado, orderBy, orderDir
 export const listChequeras = async (params = {}) => {
   const { data } = await client.get('/chequeras', { params });

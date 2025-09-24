@@ -3,8 +3,17 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { listBancos } from '../../api/bancos';
 import { listBancoCuentas } from '../../api/bancoCuentas';
-
+import Swal from 'sweetalert2';
 const ESTADOS = ['activa', 'agotada', 'bloqueada', 'anulada'];
+
+function getAxiosMsg(err) {
+  return (
+    err?.response?.data?.mensajeError ||
+    err?.response?.data?.message ||
+    err?.message ||
+    'Ocurrió un error inesperado.'
+  );
+}
 
 export default function ChequeraFormModal({
   open,
@@ -86,34 +95,115 @@ export default function ChequeraFormModal({
   const submit = async (e) => {
     e.preventDefault();
 
-    if (!form.banco_cuenta_id) return alert('Seleccione una cuenta bancaria');
-    if (!form.descripcion?.trim()) return alert('Complete la descripción');
-    const desde = Number(form.nro_desde),
-      hasta = Number(form.nro_hasta),
-      prox = Number(form.proximo_nro);
-    if (!(desde > 0 && hasta > 0 && hasta >= desde))
-      return alert('Rango de cheques inválido');
-    if (!(prox >= desde && prox <= hasta))
-      return alert('El próximo número debe estar dentro del rango');
+    // ── Validaciones de UI (mismas que tenías)
+    if (!form.banco_cuenta_id) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Falta la cuenta bancaria',
+        text: 'Seleccione una cuenta bancaria.',
+        confirmButtonColor: '#f59e0b'
+      });
+      return;
+    }
+
+    if (!form.descripcion?.trim()) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Descripción requerida',
+        text: 'Complete la descripción.',
+        confirmButtonColor: '#f59e0b'
+      });
+      return;
+    }
+
+    const desde = Number(form.nro_desde);
+    const hasta = Number(form.nro_hasta);
+
+    if (!(desde > 0 && hasta > 0 && hasta >= desde)) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Rango inválido',
+        text: 'El rango de cheques es inválido.',
+        confirmButtonColor: '#f59e0b'
+      });
+      return;
+    }
+
+    // Si proximo_nro viene vacío => NO lo enviamos (el backend usa nro_desde)
+    const hasProx =
+      form.proximo_nro !== '' &&
+      form.proximo_nro !== null &&
+      form.proximo_nro !== undefined;
+
+    let proxNum;
+    if (hasProx) {
+      proxNum = Number(form.proximo_nro);
+      if (!(proxNum >= desde && proxNum <= hasta)) {
+        await Swal.fire({
+          icon: 'warning',
+          title: 'Próximo número fuera de rango',
+          text: 'El próximo número debe estar dentro del rango.',
+          confirmButtonColor: '#f59e0b'
+        });
+        return;
+      }
+    }
 
     const payload = {
       banco_cuenta_id: Number(form.banco_cuenta_id),
       descripcion: form.descripcion.trim(),
       nro_desde: desde,
       nro_hasta: hasta,
-      proximo_nro: prox,
+      ...(hasProx ? { proximo_nro: proxNum } : {}), // <- clave: si está vacío, no lo mandamos
       estado: form.estado
     };
 
     try {
       setSaving(true);
-      await onSubmit(payload);
+      await onSubmit(payload); // tu función create/update
+
+      await Swal.fire({
+        icon: 'success',
+        title: hasProx ? 'Chequera guardada' : 'Chequera creada',
+        text: `Rango ${desde}–${hasta}`,
+        confirmButtonColor: '#10b981'
+      });
+
       onClose();
+    } catch (err) {
+      const status = err?.response?.status;
+      const msg = getAxiosMsg(err);
+
+      if (status === 409) {
+        await Swal.fire({
+          icon: 'error',
+          title: 'Rango en conflicto',
+          text:
+            msg ||
+            'Existe otra chequera con rango que se superpone en esta cuenta bancaria.',
+          footer:
+            'Verificá que el rango no se superponga con otra chequera de la misma cuenta.',
+          confirmButtonColor: '#ef4444'
+        });
+      } else if (status === 400) {
+        await Swal.fire({
+          icon: 'warning',
+          title: 'Datos inválidos',
+          text: msg,
+          confirmButtonColor: '#f59e0b'
+        });
+      } else {
+        await Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: msg,
+          confirmButtonColor: '#ef4444'
+        });
+      }
     } finally {
       setSaving(false);
     }
   };
-
   return (
     <AnimatePresence>
       {open && (
