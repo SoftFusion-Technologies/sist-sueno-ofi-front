@@ -24,25 +24,27 @@ const chequesLinks = [
     label: 'Cheques',
     icon: <FaMoneyCheckAlt />
   },
+  ,
+  {
+    to: '/dashboard/cheques/movimientos',
+    label: 'Movimientos de Cheque',
+    icon: <FaExchangeAlt />
+  },
   {
     to: '/dashboard/cheques/imagenes',
     label: 'Imágenes de Cheques',
     icon: <FaImages />
   },
-  {
-    to: '/dashboard/cheques/imagenes-thumbs',
-    label: 'Thumbnails',
-    icon: <FaImage />
-  },
+
   {
     to: '/dashboard/cheques/imagenes-eventos',
     label: 'Eventos de Imágenes',
     icon: <FaHistory />
   },
   {
-    to: '/dashboard/cheques/movimientos',
-    label: 'Movimientos de Cheque',
-    icon: <FaExchangeAlt />
+    to: '/dashboard/cheques/imagenes-thumbs',
+    label: 'Thumbnails',
+    icon: <FaImage />
   }
 ];
 

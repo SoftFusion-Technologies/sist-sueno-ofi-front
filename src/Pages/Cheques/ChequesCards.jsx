@@ -30,6 +30,7 @@ import ChequeFormModal from '../../Components/Cheques/ChequeFormModal';
 import ChequeViewModal from '../../Components/Cheques/ChequeViewModal';
 import ChequeTransitionModal from '../../Components/Cheques/ChequeTransitionModal';
 import ConfirmDialog from '../../Components/Common/ConfirmDialog';
+import ChequeMovimientosTablePlus from './ChequeMovimientosTablePlus';
 
 const useDebounce = (value, ms = 400) => {
   const [deb, setDeb] = useState(value);
@@ -72,6 +73,9 @@ export default function ChequesCards() {
   const [trOpen, setTrOpen] = useState(false);
   const [trAction, setTrAction] = useState(null);
   const [trItem, setTrItem] = useState(null);
+
+  const [movOpen, setMovOpen] = useState(false);
+  const [chequeMov, setChequeMov] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -445,6 +449,11 @@ export default function ChequesCards() {
                       setModalOpen(true);
                     }}
                     onDelete={(row) => onAskDelete(row)}
+                    onMovimientos={(row) => {
+                      // Abrís modal/slideover o navegas a ruta
+                      setChequeMov(row); // ejemplo: guardar cheque actual
+                      setMovOpen(true); // abrir modal de movimientos
+                    }}
                     onActions={(() => {
                       const a = allowedActions(it);
                       return {
@@ -514,6 +523,48 @@ export default function ChequesCards() {
         onCancel={() => setConfirmOpen(false)}
         onConfirm={onConfirmDelete}
       />
+      {movOpen && chequeMov && (
+        <Modal onClose={() => setMovOpen(false)}>
+          <ChequeMovimientosTablePlus chequeId={chequeMov.id} />
+        </Modal>
+      )}
     </>
+  );
+}
+
+function Modal({ title, children, onClose, maxWidth = 900 }) {
+  React.useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && onClose?.();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[9999]">
+      {/* overlay */}
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      {/* dialog */}
+      <div className="absolute inset-0 flex items-center justify-center p-4">
+        <div
+          className="w-full max-h-[85vh] overflow-auto rounded-2xl bg-black/80 ring-1 ring-white/15 shadow-[0_10px_40px_rgba(0,0,0,0.6)]"
+          style={{ maxWidth }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+            <h3 className="text-white font-semibold">{title}</h3>
+            <button
+              onClick={onClose}
+              className="px-3 py-1.5 rounded-lg bg-white/10 text-white hover:bg-white/20"
+            >
+              Cerrar
+            </button>
+          </div>
+          <div className="p-4">{children}</div>
+        </div>
+      </div>
+    </div>
   );
 }

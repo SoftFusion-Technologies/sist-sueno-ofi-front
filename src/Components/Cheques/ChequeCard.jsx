@@ -14,7 +14,8 @@ import {
   FaBan, // Anular
   FaMoneyCheckAlt, // Icono principal
   FaUniversity, // Banco
-  FaBook // Chequera
+  FaBook, // Chequera
+  FaMoneyBill
 } from 'react-icons/fa';
 
 // Config visual por acción
@@ -130,6 +131,7 @@ export default function ChequeCard({
   onView,
   onEdit,
   onDelete,
+  onMovimientos,
   onActions // { depositar, acreditar, rechazar, aplicarProveedor, entregar, compensar, anular }
 }) {
   if (!item) return null;
@@ -238,12 +240,19 @@ export default function ChequeCard({
                 classes="bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-300"
               />
               <ActionBtn
-                label="Editar"
+                label=""
                 icon={<FaEdit />}
                 onClick={() => onEdit?.(item)}
                 classes="bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-300"
               />
 
+              {/* 🔹 Nuevo botón Movimientos */}
+              <ActionBtn
+                label="Movimientos"
+                icon={<FaMoneyBill />} // o FaExchangeAlt si prefieres
+                onClick={() => onMovimientos?.(item)}
+                classes="bg-teal-600 hover:bg-teal-700 focus:ring-teal-300"
+              />
               {/* Transiciones válidas (si hay handler definido) */}
               {allowed.map((key) => {
                 const cfg = BTN_CONFIG[key];
@@ -263,10 +272,10 @@ export default function ChequeCard({
               {/* Eliminar a la derecha */}
               <div className="ml-auto" />
               <ActionBtn
-                label="Eliminar"
+                label=""
                 icon={<FaTrash />}
                 onClick={() => onDelete?.(item)}
-                classes="bg-zinc-600 hover:bg-zinc-700 focus:ring-zinc-300"
+                classes="bg-red-600 hover:bg-red-700 focus:ring-red-300"
               />
             </div>
           </div>
