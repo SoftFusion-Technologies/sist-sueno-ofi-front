@@ -2,7 +2,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import {
-  FaEye,
+  FaRegFolderOpen,
   FaEdit,
   FaTrash,
   FaArrowDown, // Depositar
@@ -15,7 +15,8 @@ import {
   FaMoneyCheckAlt, // Icono principal
   FaUniversity, // Banco
   FaBook, // Chequera
-  FaMoneyBill
+  FaMoneyBill, // movimientows
+  FaImages // imagenes
 } from 'react-icons/fa';
 
 // Config visual por acción
@@ -81,6 +82,7 @@ const Chip = ({ text, cls }) => (
   </span>
 );
 
+
 const chipTipo = (t = 'recibido') =>
   t === 'emitido' ? 'bg-amber-100 text-amber-700' : 'bg-sky-100 text-sky-700';
 
@@ -131,7 +133,8 @@ export default function ChequeCard({
   onView,
   onEdit,
   onDelete,
-  onMovimientos,
+  onMovimientos, //movimientos
+  onImagenes, // imagenes
   onActions // { depositar, acreditar, rechazar, aplicarProveedor, entregar, compensar, anular }
 }) {
   if (!item) return null;
@@ -232,18 +235,25 @@ export default function ChequeCard({
           {/* Acciones */}
           <div className="mt-4 -mx-1 overflow-x-auto">
             <div className="flex items-center gap-2 px-1">
-              {/* Ver / Editar */}
+              {/* Abrir / Editar */}
               <ActionBtn
-                label="Ver"
-                icon={<FaEye />}
+                label="Abrir"
+                icon={<FaRegFolderOpen />}
                 onClick={() => onView?.(item)}
-                classes="bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-300"
+                classes="bg-green-600 text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-400"
               />
               <ActionBtn
-                label=""
+                label="Editar"
                 icon={<FaEdit />}
                 onClick={() => onEdit?.(item)}
-                classes="bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-300"
+                classes="bg-yellow-500 hover:bg-yellow-700 focus:ring-yellow-300"
+              />
+
+              <ActionBtn
+                label="Imágenes"
+                icon={<FaImages />}
+                onClick={() => onImagenes?.(item)} // callback hacia el padre
+                classes="bg-purple-600 hover:bg-purple-700 focus:ring-purple-300"
               />
 
               {/* 🔹 Nuevo botón Movimientos */}
@@ -272,7 +282,7 @@ export default function ChequeCard({
               {/* Eliminar a la derecha */}
               <div className="ml-auto" />
               <ActionBtn
-                label=""
+                label="Eliminar"
                 icon={<FaTrash />}
                 onClick={() => onDelete?.(item)}
                 classes="bg-red-600 hover:bg-red-700 focus:ring-red-300"

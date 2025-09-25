@@ -31,6 +31,7 @@ import ChequeViewModal from '../../Components/Cheques/ChequeViewModal';
 import ChequeTransitionModal from '../../Components/Cheques/ChequeTransitionModal';
 import ConfirmDialog from '../../Components/Common/ConfirmDialog';
 import ChequeMovimientosTablePlus from './ChequeMovimientosTablePlus';
+import ChequeImagesManager from '../../Components/Cheques/ChequeImagesManager';
 
 const useDebounce = (value, ms = 400) => {
   const [deb, setDeb] = useState(value);
@@ -74,8 +75,18 @@ export default function ChequesCards() {
   const [trAction, setTrAction] = useState(null);
   const [trItem, setTrItem] = useState(null);
 
+  // abrir para ver movimientos
   const [movOpen, setMovOpen] = useState(false);
   const [chequeMov, setChequeMov] = useState(null);
+
+  // abrir para ver imagenes
+  const [imagenesOpen, setImagenesOpen] = useState(false);
+  const [chequeImagen, setChequeImagen] = useState(null);
+  // handler
+  const handleImagenes = (row) => {
+    setChequeImagen(row);
+    setImagenesOpen(true);
+  };
 
   useEffect(() => {
     (async () => {
@@ -454,6 +465,7 @@ export default function ChequesCards() {
                       setChequeMov(row); // ejemplo: guardar cheque actual
                       setMovOpen(true); // abrir modal de movimientos
                     }}
+                    onImagenes={handleImagenes}
                     onActions={(() => {
                       const a = allowedActions(it);
                       return {
@@ -526,6 +538,11 @@ export default function ChequesCards() {
       {movOpen && chequeMov && (
         <Modal onClose={() => setMovOpen(false)}>
           <ChequeMovimientosTablePlus chequeId={chequeMov.id} />
+        </Modal>
+      )}
+      {imagenesOpen && chequeImagen && (
+        <Modal onClose={() => setImagenesOpen(false)}>
+          <ChequeImagesManager chequeId={chequeImagen.id} />
         </Modal>
       )}
     </>

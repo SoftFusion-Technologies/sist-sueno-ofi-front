@@ -75,6 +75,7 @@ import AdminPageCheques from './Pages/Cheques/AdminPageCheques';
 import ChequerasCards from './Pages/Cheques/ChequerasCards';
 import ChequesCards from './Pages/Cheques/ChequesCards';
 import ChequeMovimientosTablePlus from './Pages/Cheques/ChequeMovimientosTablePlus';
+import ChequeImagesManager from './Components/Cheques/ChequeImagesManager';
 
 function AppContent() {
   const { hideLayoutFooter, hideLayoutNav } = useLayoutVisibility();
@@ -489,6 +490,15 @@ function AppContent() {
               <ProtectedRoute>
                 {' '}
                 <ChequeMovimientosTablePlus />{' '}
+              </ProtectedRoute>
+            }
+          />
+          <Ruta
+            path="/dashboard/cheques/:chequeId/imagenes"
+            element={
+              <ProtectedRoute>
+                {' '}
+                <ChequeImagesManager  />{' '}
               </ProtectedRoute>
             }
           />
