@@ -811,6 +811,7 @@ export default function PedidosStockPanel() {
   // ================== RENDER ==================
   return (
     <div className="w-full">
+      <NavbarStaff></NavbarStaff>
       {/* HEADER */}
       <motion.div
         className="flex items-center justify-between flex-wrap gap-5 mb-8 p-5 rounded-2xl bg-gradient-to-r from-slate-50 via-white to-slate-50 shadow-md border border-slate-200/60"
@@ -1384,6 +1385,7 @@ import {
   FaCheckCircle,
   FaTimesCircle
 } from 'react-icons/fa';
+import NavbarStaff from '../Dash/NavbarStaff';
 
 /* Skeleton elegante */
 function DetailSkeleton() {

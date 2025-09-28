@@ -76,6 +76,8 @@ import ChequerasCards from './Pages/Cheques/ChequerasCards';
 import ChequesCards from './Pages/Cheques/ChequesCards';
 import ChequeMovimientosTablePlus from './Pages/Cheques/ChequeMovimientosTablePlus';
 import ChequeImagesManager from './Components/Cheques/ChequeImagesManager';
+import AdminPageTesoreria from './Pages/Tesoreria/AdminPageTesoreria';
+import TesoFlujoPage from './Pages/Tesoreria/TesoFlujoPage';
 
 function AppContent() {
   const { hideLayoutFooter, hideLayoutNav } = useLayoutVisibility();
@@ -498,11 +500,30 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 {' '}
-                <ChequeImagesManager  />{' '}
+                <ChequeImagesManager />{' '}
               </ProtectedRoute>
             }
           />
-          {/* MODULO DENTRO DE CHEQUES Final BENJAMIN ORELLANA 21 09 25 */}
+          {/* MODULO DENTRO DE TESORERIA INICIO BENJAMIN ORELLANA 21 09 25 */}
+          <Ruta
+            path="/dashboard/tesoreria"
+            element={
+              <ProtectedRoute>
+                {' '}
+                <AdminPageTesoreria />{' '}
+              </ProtectedRoute>
+            }
+          />
+          <Ruta
+            path="/dashboard/tesoreria/flujo"
+            element={
+              <ProtectedRoute>
+                {' '}
+                <TesoFlujoPage />{' '}
+              </ProtectedRoute>
+            }
+          />
+          {/* MODULO DENTRO DE TESORERIA FINAL BENJAMIN ORELLANA 28 09 25 */}{' '}
           {/* componentes del staff y login FINAL */}
           {/* <Ruta path="/*" element={<NotFound />} /> */}
           {/* 🔁 Ruta no encontrada */}
