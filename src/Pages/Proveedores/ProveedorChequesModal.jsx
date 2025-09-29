@@ -300,10 +300,10 @@ export default function ProveedorChequesModal({
               </div>
 
               {/* Body: Tabla con scroll */}
-              <div className="h-full flex flex-col">
+              <div className="relative">
                 {/* tabla */}
-                <div className="flex-1 overflow-auto">
-                  <table className="w-full text-sm">
+                <div className="overflow-x-auto [-webkit-overflow-scrolling:touch] md:rounded-xl border border-gray-200">
+                  <table className="min-w-[920px] w-full text-sm">
                     <thead className="sticky top-0 z-10 bg-[#0c1112] border-b border-white/10">
                       <tr className="text-gray-300">
                         <th className="text-left font-semibold px-4 py-3">#</th>

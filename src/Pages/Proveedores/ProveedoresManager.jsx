@@ -15,12 +15,7 @@ import ProveedorContactosModal from './ProveedorContactosModal';
 import ProveedorCuentasModal from './ProveedorCuentasModal';
 import ProductoProveedorModal from './ProductoProveedorModal';
 import PPHistorialModal from './PPHistorialModal';
-import {
-  FaBuilding,
-  FaPlus,
-  FaSearch,
-  FaSyncAlt,
-} from 'react-icons/fa';
+import { FaBuilding, FaPlus, FaSearch, FaSyncAlt } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import {
   X,
@@ -33,6 +28,7 @@ import {
   BarChart3
 } from 'lucide-react';
 import ProveedorChequesModal from './ProveedorChequesModal';
+import ProveedorChequesKPIModal from './Components/ProveedorChequesKPIModal';
 
 const cleanCUIT = (v) => (typeof v === 'string' ? v.replace(/\D+/g, '') : v);
 
@@ -357,19 +353,6 @@ export default function ProveedoresManager() {
     }
   }
 
-  const navigate = useNavigate();
-
-  const pid = proveedorSel.id;
-
-  const abrirChequesProveedor = () => {
-    if (!pid) return;
-    navigate(`/dashboard/proveedores/${pid}/cheques`);
-  };
-  const abrirChequesResumen = () => {
-    if (!pid) return;
-    navigate(`/dashboard/proveedores/${pid}/cheques/resumen`);
-  };
-
   // estado
   const [chequesOpen, setChequesOpen] = useState(false);
 
@@ -378,6 +361,14 @@ export default function ProveedoresManager() {
     if (!proveedorSel?.id) return; // guardita
     setPickerOpen(false);
     setChequesOpen(true);
+  };
+
+  const [chequesKPIsOpen, setChequesKPIsOpen] = useState(false);
+
+  // handlers (ya tenías navigate, pero aquí estilo modal)
+  const abrirChequesResumen = () => {
+    if (!proveedorSel?.id) return;
+    setChequesKPIsOpen(true);
   };
 
   const totalPages = Math.max(
@@ -1085,18 +1076,7 @@ export default function ProveedoresManager() {
                     {/* ➕ Nuevo: KPIs de cheques */}
                     <button
                       onClick={abrirChequesResumen}
-                      disabled={!pid}
-                      className={`w-full rounded-xl border border-white/10 transition p-4 text-left cursor-pointer focus:outline-none
-                ${
-                  pid
-                    ? 'bg-white/5 hover:bg-white/10 focus:ring-2 focus:ring-emerald-500/40 active:scale-[.99]'
-                    : 'bg-white/5 opacity-60 cursor-not-allowed'
-                }`}
-                      title={
-                        pid
-                          ? 'Ver KPIs de cheques del proveedor'
-                          : 'Seleccione un proveedor'
-                      }
+                      className="w-full rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition p-4 text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500/40 active:scale-[.99]"
                     >
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-lg bg-white/5 grid place-items-center border border-white/10">
@@ -1147,11 +1127,19 @@ export default function ProveedoresManager() {
         proveedorNombre={proveedorSel.nombre}
         userId={userId}
       />
+      {/* nuevo para ver cheques */}
       <ProveedorChequesModal
         open={chequesOpen}
         onClose={() => setChequesOpen(false)}
         proveedorId={proveedorSel?.id}
         proveedorNombre={proveedorSel?.nombre}
+        userId={userId}
+      />
+      <ProveedorChequesKPIModal
+        open={chequesKPIsOpen}
+        onClose={() => setChequesKPIsOpen(false)}
+        proveedorId={proveedorSel.id}
+        proveedorNombre={proveedorSel.nombre}
         userId={userId}
       />
     </>
