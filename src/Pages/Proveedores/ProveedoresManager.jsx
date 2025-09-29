@@ -20,15 +20,19 @@ import {
   FaPlus,
   FaSearch,
   FaSyncAlt,
-  FaEdit,
-  FaTrash,
-  FaCheckCircle,
-  FaTimesCircle,
-  FaWhatsapp,
-  FaGlobe,
-  FaMapMarkedAlt
 } from 'react-icons/fa';
-import { X, CreditCard, Users, FolderOpen, Tags, Clock } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import {
+  X,
+  CreditCard,
+  Users,
+  FolderOpen,
+  Tags,
+  Clock,
+  Banknote,
+  BarChart3
+} from 'lucide-react';
+import ProveedorChequesModal from './ProveedorChequesModal';
 
 const cleanCUIT = (v) => (typeof v === 'string' ? v.replace(/\D+/g, '') : v);
 
@@ -352,6 +356,29 @@ export default function ProveedoresManager() {
       });
     }
   }
+
+  const navigate = useNavigate();
+
+  const pid = proveedorSel.id;
+
+  const abrirChequesProveedor = () => {
+    if (!pid) return;
+    navigate(`/dashboard/proveedores/${pid}/cheques`);
+  };
+  const abrirChequesResumen = () => {
+    if (!pid) return;
+    navigate(`/dashboard/proveedores/${pid}/cheques/resumen`);
+  };
+
+  // estado
+  const [chequesOpen, setChequesOpen] = useState(false);
+
+  // abrir cheques desde el picker del proveedor seleccionado
+  const abrirChequesProveedorModal = () => {
+    if (!proveedorSel?.id) return; // guardita
+    setPickerOpen(false);
+    setChequesOpen(true);
+  };
 
   const totalPages = Math.max(
     1,
@@ -1035,6 +1062,56 @@ export default function ProveedoresManager() {
                         </div>
                       </div>
                     </button>
+                    {/* ➕ Nuevo: Cheques del proveedor */}
+                    <button
+                      onClick={abrirChequesProveedorModal}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition p-4 text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500/40 active:scale-[.99]"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-white/5 grid place-items-center border border-white/10">
+                          <Banknote size={18} />
+                        </div>
+                        <div>
+                          <div className="text-gray-100 font-medium">
+                            Cheques
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            Ver cheques de este proveedor
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* ➕ Nuevo: KPIs de cheques */}
+                    <button
+                      onClick={abrirChequesResumen}
+                      disabled={!pid}
+                      className={`w-full rounded-xl border border-white/10 transition p-4 text-left cursor-pointer focus:outline-none
+                ${
+                  pid
+                    ? 'bg-white/5 hover:bg-white/10 focus:ring-2 focus:ring-emerald-500/40 active:scale-[.99]'
+                    : 'bg-white/5 opacity-60 cursor-not-allowed'
+                }`}
+                      title={
+                        pid
+                          ? 'Ver KPIs de cheques del proveedor'
+                          : 'Seleccione un proveedor'
+                      }
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-white/5 grid place-items-center border border-white/10">
+                          <BarChart3 size={18} />
+                        </div>
+                        <div>
+                          <div className="text-gray-100 font-medium">
+                            KPIs de cheques
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            Totales, por estado y tipo
+                          </div>
+                        </div>
+                      </div>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1068,6 +1145,13 @@ export default function ProveedoresManager() {
         onClose={() => setHistOpen(false)}
         proveedorId={proveedorSel.id}
         proveedorNombre={proveedorSel.nombre}
+        userId={userId}
+      />
+      <ProveedorChequesModal
+        open={chequesOpen}
+        onClose={() => setChequesOpen(false)}
+        proveedorId={proveedorSel?.id}
+        proveedorNombre={proveedorSel?.nombre}
         userId={userId}
       />
     </>
