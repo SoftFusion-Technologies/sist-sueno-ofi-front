@@ -9,6 +9,10 @@ import SearchableSelect from '../Common/SearchableSelect';
 
 import { formatDateTimeAR, formatMoneyARS } from '../../utils/formatters';
 import { fmtTercero, getTerceroSearchText } from '../../utils/tercerosFormat';
+import {
+  fmtChequera,
+  getChequeraSearchText
+} from '../../utils/chequerasFormat';
 
 const TIPOS = ['recibido', 'emitido'];
 const CANALES = ['C1', 'C2'];
@@ -260,6 +264,15 @@ export default function ChequeFormModal({ open, onClose, onSubmit, initial }) {
     }
   };
 
+  const cuentasIdx = useMemo(
+    () => Object.fromEntries((cuentas || []).map((c) => [String(c.id), c])),
+    [cuentas]
+  );
+  const bancosIdx = useMemo(
+    () => Object.fromEntries((bancos || []).map((b) => [String(b.id), b])),
+    [bancos]
+  );
+
   return (
     <AnimatePresence>
       {open && (
@@ -335,18 +348,23 @@ export default function ChequeFormModal({ open, onClose, onSubmit, initial }) {
                       ))}
                     </select>
                   </div>
-                  <SearchableSelect
-                    label={`Banco ${form.tipo === 'recibido' ? '*' : ''}`}
-                    items={bancos}
-                    value={form.banco_id}
-                    onChange={(id) =>
-                      setForm((f) => ({ ...f, banco_id: id ? Number(id) : '' }))
-                    }
-                    getOptionLabel={(b) => b?.nombre ?? ''}
-                    getOptionValue={(b) => b?.id}
-                    placeholder="Seleccionar banco…"
-                    portal
-                  />
+                  <div className="-mt-2">
+                    <SearchableSelect
+                      label={`Banco ${form.tipo === 'recibido' ? '*' : ''}`}
+                      items={bancos}
+                      value={form.banco_id}
+                      onChange={(id) =>
+                        setForm((f) => ({
+                          ...f,
+                          banco_id: id ? Number(id) : ''
+                        }))
+                      }
+                      getOptionLabel={(b) => b?.nombre ?? ''}
+                      getOptionValue={(b) => b?.id}
+                      placeholder="Seleccionar banco…"
+                      portal
+                    />
+                  </div>
                 </div>
 
                 {/* Línea 2: chequera (sólo emitido) */}
@@ -356,24 +374,20 @@ export default function ChequeFormModal({ open, onClose, onSubmit, initial }) {
                       label="Chequera *"
                       items={chequeras}
                       value={form.chequera_id}
-                      onChange={(id, opt) =>
+                      onChange={(id) =>
                         setForm((f) => ({
                           ...f,
-                          chequera_id: id ? Number(id) : '',
-                          numero:
-                            f.numero ||
-                            (opt?.proximo_nro
-                              ? String(opt.proximo_nro)
-                              : f.numero)
+                          chequera_id: id ? Number(id) : ''
                         }))
                       }
                       getOptionLabel={(ch) =>
-                        ch
-                          ? `#${ch.id} — ${ch.descripcion} (${ch.nro_desde}-${ch.nro_hasta}) • Próx: ${ch.proximo_nro}`
-                          : ''
+                        fmtChequera(ch, cuentasIdx, bancosIdx)
                       }
                       getOptionValue={(ch) => ch?.id}
-                      placeholder="Buscar o seleccionar chequera…"
+                      getOptionSearchText={(ch) =>
+                        getChequeraSearchText(ch, cuentasIdx, bancosIdx)
+                      }
+                      placeholder="Buscar chequera…"
                       portal
                     />
                   </div>
