@@ -16,7 +16,8 @@ export default function SearchableSelect({
   portal = false,
   dropdownMaxHeight = '60vh',
   portalZIndex = 2000,
-  menuPlacement = 'auto'
+  menuPlacement = 'auto',
+  getOptionSearchText = (o, getLabel) => getLabel(o) || ''
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
@@ -35,13 +36,20 @@ export default function SearchableSelect({
     [items, value, getOptionValue]
   );
 
+  const normalize = (str) =>
+    (str || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '');
+
   const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase();
+    const s = normalize(q.trim());
     if (!s) return items;
-    return items.filter((i) =>
-      (getOptionLabel(i) || '').toLowerCase().includes(s)
-    );
-  }, [items, q, getOptionLabel]);
+    return items.filter((i) => {
+      const haystack = normalize(getOptionSearchText(i, getOptionLabel));
+      return haystack.includes(s);
+    });
+  }, [items, q, getOptionLabel, getOptionSearchText]);
 
   useEffect(() => {
     if (!open) return;

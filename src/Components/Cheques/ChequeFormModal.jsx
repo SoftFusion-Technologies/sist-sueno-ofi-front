@@ -7,6 +7,9 @@ import { listBancoCuentas } from '../../api/bancoCuentas';
 import { listClientes, listProveedores, listVentas } from '../../api/terceros';
 import SearchableSelect from '../Common/SearchableSelect';
 
+import { formatDateTimeAR, formatMoneyARS } from '../../utils/formatters';
+import { fmtTercero, getTerceroSearchText } from '../../utils/tercerosFormat';
+
 const TIPOS = ['recibido', 'emitido'];
 const CANALES = ['C1', 'C2'];
 const ESTADOS = [
@@ -22,19 +25,73 @@ const ESTADOS = [
   'compensado'
 ];
 
-const fmtVenta = (v) => {
+export const fmtVenta = (v, clientesIdx) => {
   if (!v) return '';
-  const code = v.codigo || v.comprobante || v.numero || `ID ${v.id}`;
-  const nom = v.cliente_nombre || v.cliente || v.nombre || '';
-  const fecha = v.fecha || v.created_at || '';
-  return [code, nom, fecha].filter(Boolean).join(' • ');
+
+  const code = v.codigo || v.comprobante || v.numero || `#${v.id}`;
+
+  // intenta en este orden: objeto anidado -> campos sueltos -> índice por id -> fallback
+  const clienteNombre =
+    v.cliente?.nombre ||
+    v.cliente_nombre ||
+    v.cliente ||
+    v.nombre ||
+    (v.cliente_id && clientesIdx?.[String(v.cliente_id)]?.nombre) ||
+    (v.cliente_id ? `Cliente #${v.cliente_id}` : 'Sin cliente');
+
+  const fecha = formatDateTimeAR(v.fecha || v.created_at);
+  const total = v.total ? formatMoneyARS(v.total) : null;
+  const estado = v.estado || null;
+
+  // construimos sin duplicar bullets vacíos
+  const parts = [
+    code,
+    fecha,
+    total,
+    estado && `${estado}`,
+    `Cliente: ${clienteNombre}`
+  ].filter(Boolean);
+
+  return parts.join(' • ');
 };
-const fmtTercero = (t) => {
-  if (!t) return '';
-  const nom = t.nombre || t.razon_social || '';
-  const doc = t.cuit || t.documento || '';
-  return [nom, doc].filter(Boolean).join(' • ');
+
+// Texto “oculto” para la búsqueda (más campos = mejor recall)
+export const getVentaSearchText = (
+  v,
+  clientesIdx = null,
+  resolverNombreCliente = null
+) => {
+  if (!v) return '';
+
+  // 1) intentá usar un resolver custom si te lo pasan
+  let nom =
+    (typeof resolverNombreCliente === 'function' && resolverNombreCliente(v)) ||
+    // 2) luego campos ya presentes en la venta
+    v?.cliente?.nombre ||
+    v?.cliente_nombre ||
+    v?.cliente ||
+    v?.nombre ||
+    // 3) por último, buscá por cliente_id en el índice
+    (v?.cliente_id && clientesIdx?.[String(v.cliente_id)]?.nombre) ||
+    '';
+
+  const fecha = formatDateTimeAR(v.fecha || v.created_at);
+  const comp = v.codigo || v.comprobante || v.numero || '';
+  const total = v.total != null ? String(v.total) : '';
+  const estado = v.estado || '';
+  const id = v.id != null ? String(v.id) : '';
+
+  // Incluimos todo para que busque por cualquiera de estos tokens
+  return [id, comp, nom, fecha, total, estado].filter(Boolean).join(' ');
 };
+
+// ahora lo resuelve el utils
+// const fmtTercero = (t) => {
+//   if (!t) return '';
+//   const nom = t.nombre || t.razon_social || '';
+//   const doc = t.cuit || t.documento || '';
+//   return [nom, doc].filter(Boolean).join(' • ');
+// };
 
 export default function ChequeFormModal({ open, onClose, onSubmit, initial }) {
   const isEdit = !!initial?.id;
@@ -95,6 +152,13 @@ export default function ChequeFormModal({ open, onClose, onSubmit, initial }) {
       setVentas(Array.isArray(vts) ? vts : vts.data || []);
     })().catch(() => {});
   }, [open]);
+
+  const clientesIdx = useMemo(() => {
+    if (!Array.isArray(clientes)) return {};
+    return Object.fromEntries(clientes.map((c) => [String(c.id), c]));
+  }, [clientes]);
+
+  const labelVenta = (v) => fmtVenta(v, clientesIdx);
 
   useEffect(() => {
     if (open) {
@@ -411,6 +475,7 @@ export default function ChequeFormModal({ open, onClose, onSubmit, initial }) {
                         }
                         getOptionLabel={fmtTercero}
                         getOptionValue={(c) => c?.id}
+                        getOptionSearchText={getTerceroSearchText} // ⬅️ permite buscar por DNI/CUIT/teléfono/etc.
                         placeholder="Buscar cliente…"
                         portal
                       />
@@ -424,8 +489,11 @@ export default function ChequeFormModal({ open, onClose, onSubmit, initial }) {
                             venta_id: id ? Number(id) : ''
                           }))
                         }
-                        getOptionLabel={fmtVenta}
+                        getOptionLabel={labelVenta}
                         getOptionValue={(v) => v?.id}
+                        getOptionSearchText={(v) =>
+                          getVentaSearchText(v, clientesIdx)
+                        }
                         placeholder="Buscar venta…"
                         portal
                       />
