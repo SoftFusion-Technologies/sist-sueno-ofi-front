@@ -16,6 +16,7 @@ import {
 } from '../../ui/animHelpers';
 import { X, CreditCard, Building2, Book, Hash, ArrowRight } from 'lucide-react';
 
+
 const ESTADOS = ['activa', 'agotada', 'bloqueada', 'anulada'];
 
 function getAxiosMsg(err) {

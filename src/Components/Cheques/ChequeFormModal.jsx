@@ -6,13 +6,37 @@ import { listChequeras } from '../../api/chequeras';
 import { listBancoCuentas } from '../../api/bancoCuentas';
 import { listClientes, listProveedores, listVentas } from '../../api/terceros';
 import SearchableSelect from '../Common/SearchableSelect';
-
+import {
+  backdropV,
+  panelV,
+  formContainerV,
+  fieldV,
+  pad,
+  toInt,
+  makeFieldV,
+  makeFormContainerV
+} from '../../ui/animHelpers';
 import { formatDateTimeAR, formatMoneyARS } from '../../utils/formatters';
 import { fmtTercero, getTerceroSearchText } from '../../utils/tercerosFormat';
 import {
   fmtChequera,
   getChequeraSearchText
 } from '../../utils/chequerasFormat';
+
+import {
+  X,
+  CreditCard,
+  Building2,
+  Book,
+  Hash,
+  DollarSign,
+  User,
+  Calendar,
+  ShoppingCart,
+  Factory,
+  Tag,
+  MessageSquare
+} from 'lucide-react';
 
 const TIPOS = ['recibido', 'emitido'];
 const CANALES = ['C1', 'C2'];
@@ -273,84 +297,153 @@ export default function ChequeFormModal({ open, onClose, onSubmit, initial }) {
     [bancos]
   );
 
+  const titleId = 'cheque-modal-title';
+  const formId = 'cheque-form';
+
   return (
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
+          variants={backdropV}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
         >
-          {/* Overlay */}
-          <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/75 backdrop-blur-sm"
+            onClick={onClose}
+          />
 
-          {/* Sheet / Dialog */}
+          {/* Ambient grid + auroras */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 opacity-[0.16]"
+            style={{
+              backgroundImage:
+                'linear-gradient(to right, rgba(255,255,255,.06) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,.06) 1px, transparent 1px)',
+              backgroundSize: '36px 36px'
+            }}
+          />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -top-24 -left-20 size-[22rem] sm:size-[28rem] rounded-full blur-3xl opacity-45
+                       bg-[conic-gradient(from_180deg_at_50%_50%,rgba(59,130,246,0.14),rgba(6,182,212,0.12),rgba(99,102,241,0.12),transparent,rgba(6,182,212,0.12))]"
+          />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -bottom-20 -right-16 size-[24rem] sm:size-[30rem] rounded-full blur-3xl opacity-35
+                       bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.10),transparent_60%)]"
+          />
+
+          {/* Panel */}
           <motion.div
-            initial={{ y: 30, opacity: 0, scale: 1 }}
-            animate={{ y: 0, opacity: 1, scale: 1 }}
-            exit={{ y: 30, opacity: 0, scale: 1 }}
-            transition={{ type: 'spring', stiffness: 220, damping: 22 }}
-            className="
-              relative w-full sm:max-w-4xl bg-white
-              rounded-t-2xl sm:rounded-2xl shadow-2xl
-              max-h-[100svh] sm:max-h-[90vh]
-              flex flex-col
-              touch-pan-y overscroll-contain
-            "
+            variants={panelV}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            className="relative w-full max-w-[92vw] sm:max-w-xl md:max-w-2xl
+                       max-h-[85vh] overflow-y-auto overscroll-contain
+                       rounded-2xl border border-white/10 bg-white/[0.06] backdrop-blur-xl"
           >
-            {/* Header sticky */}
-            <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b bg-white sticky top-0 z-10">
-              <h3 className="text-lg sm:text-xl font-bold text-gray-800">
-                {isEdit ? 'Editar Cheque' : 'Nuevo Cheque'}
-              </h3>
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700"
-              >
-                Cerrar
-              </button>
-            </div>
+            {/* Borde metálico */}
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-transparent"
+              style={{ boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08)' }}
+            />
 
-            {/* Content scrollable */}
-            <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-6">
-              <form onSubmit={submit} className="space-y-5">
-                {/* Línea 1: tipo/canal/banco */}
+            {/* Close */}
+            <button
+              onClick={onClose}
+              className="absolute z-50 top-2.5 right-2.5 inline-flex h-9 w-9 items-center justify-center rounded-lg
+                         bg-white/5 border border-white/10 hover:bg-white/10 transition"
+              aria-label="Cerrar"
+            >
+              <X className="h-5 w-5 text-gray-200" />
+            </button>
+
+            <div className="relative z-10 p-5 sm:p-6 md:p-8">
+              {/* Header */}
+              <motion.div
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ type: 'spring', stiffness: 260, damping: 24 }}
+                className="mb-5 sm:mb-6 flex items-center gap-3"
+              >
+                <CreditCard className="h-6 w-6 text-gray-300 shrink-0" />
+                <h3
+                  id={titleId}
+                  className="text-xl sm:text-2xl font-bold tracking-tight text-white"
+                >
+                  {isEdit ? 'Editar Cheque' : 'Nuevo Cheque'}
+                </h3>
+              </motion.div>
+
+              {/* FORM con stagger y fields que suben */}
+              <motion.form
+                id={formId}
+                onSubmit={submit}
+                variants={formContainerV}
+                initial="hidden"
+                animate="visible"
+                className="space-y-5 sm:space-y-6"
+              >
+                {/* Tipo / Canal / Banco */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium">Tipo *</label>
+                  <motion.div variants={fieldV}>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-200 mb-2">
+                      <Tag className="h-4 w-4 text-gray-400" />
+                      Tipo <span className="text-cyan-300">*</span>
+                    </label>
                     <select
                       name="tipo"
                       value={form.tipo}
                       onChange={handle}
-                      className="w-full rounded-xl border px-3 py-2"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-3 text-white
+                                 focus:outline-none focus:ring-2 focus:ring-cyan-300/40 focus:border-transparent"
                     >
                       {TIPOS.map((t) => (
-                        <option key={t} value={t}>
+                        <option key={t} value={t} className="bg-gray-900">
                           {t}
                         </option>
                       ))}
                     </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium">Canal *</label>
+                  </motion.div>
+
+                  <motion.div variants={fieldV}>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-200 mb-2">
+                      <Tag className="h-4 w-4 text-gray-400" />
+                      Canal <span className="text-cyan-300">*</span>
+                    </label>
                     <select
                       name="canal"
                       value={form.canal}
                       onChange={handle}
-                      className="w-full rounded-xl border px-3 py-2"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-3 text-white
+                                 focus:outline-none focus:ring-2 focus:ring-cyan-300/40 focus:border-transparent"
                     >
                       {CANALES.map((t) => (
-                        <option key={t} value={t}>
+                        <option key={t} value={t} className="bg-gray-900">
                           {t}
                         </option>
                       ))}
                     </select>
-                  </div>
-                  <div className="-mt-2">
+                  </motion.div>
+
+                  <motion.div variants={fieldV} className="-mt-1.5">
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-200 mb-2">
+                      <Building2 className="h-4 w-4 text-gray-400" />
+                      Banco{' '}
+                      {form.tipo === 'recibido' && (
+                        <span className="text-cyan-300">*</span>
+                      )}
+                    </label>
                     <SearchableSelect
-                      label={`Banco ${form.tipo === 'recibido' ? '*' : ''}`}
                       items={bancos}
                       value={form.banco_id}
                       onChange={(id) =>
@@ -364,14 +457,17 @@ export default function ChequeFormModal({ open, onClose, onSubmit, initial }) {
                       placeholder="Seleccionar banco…"
                       portal
                     />
-                  </div>
+                  </motion.div>
                 </div>
 
-                {/* Línea 2: chequera (sólo emitido) */}
+                {/* Chequera (solo emitido) */}
                 {form.tipo === 'emitido' && (
-                  <div className="grid grid-cols-1 gap-4">
+                  <motion.div variants={fieldV}>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-200 mb-2">
+                      <Book className="h-4 w-4 text-gray-400" />
+                      Chequera <span className="text-cyan-300">*</span>
+                    </label>
                     <SearchableSelect
-                      label="Chequera *"
                       items={chequeras}
                       value={form.chequera_id}
                       onChange={(id) =>
@@ -390,14 +486,15 @@ export default function ChequeFormModal({ open, onClose, onSubmit, initial }) {
                       placeholder="Buscar chequera…"
                       portal
                     />
-                  </div>
+                  </motion.div>
                 )}
 
-                {/* Línea 3: número/monto/beneficiario */}
+                {/* Número / Monto / Beneficiario */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium">
-                      Número *
+                  <motion.div variants={fieldV}>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-200 mb-2">
+                      <Hash className="h-4 w-4 text-gray-400" />
+                      Número <span className="text-cyan-300">*</span>
                     </label>
                     <input
                       name="numero"
@@ -405,11 +502,17 @@ export default function ChequeFormModal({ open, onClose, onSubmit, initial }) {
                       onChange={handle}
                       type="number"
                       min="1"
-                      className="w-full rounded-xl border px-3 py-2"
+                      inputMode="numeric"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-3 text-white
+                                 focus:outline-none focus:ring-2 focus:ring-cyan-300/40 focus:border-transparent"
                     />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium">Monto *</label>
+                  </motion.div>
+
+                  <motion.div variants={fieldV}>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-200 mb-2">
+                      <DollarSign className="h-4 w-4 text-gray-400" />
+                      Monto <span className="text-cyan-300">*</span>
+                    </label>
                     <input
                       name="monto"
                       value={form.monto}
@@ -417,157 +520,201 @@ export default function ChequeFormModal({ open, onClose, onSubmit, initial }) {
                       type="number"
                       step="0.01"
                       min="0"
-                      className="w-full rounded-xl border px-3 py-2"
+                      inputMode="decimal"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-3 text-white
+                                 focus:outline-none focus:ring-2 focus:ring-cyan-300/40 focus:border-transparent"
                     />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium">
+                  </motion.div>
+
+                  <motion.div variants={fieldV}>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-200 mb-2">
+                      <User className="h-4 w-4 text-gray-400" />
                       Beneficiario
                     </label>
                     <input
                       name="beneficiario_nombre"
                       value={form.beneficiario_nombre}
                       onChange={handle}
-                      className="w-full rounded-xl border px-3 py-2"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-3 text-white
+                                 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-300/40 focus:border-transparent"
+                      placeholder="(Opcional)"
                     />
-                  </div>
+                  </motion.div>
                 </div>
 
-                {/* Línea 4: fechas */}
+                {/* Fechas */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium">
-                      Fecha emisión
+                  <motion.div variants={fieldV}>
+                    <label className="block text-sm font-medium text-gray-200 mb-2">
+                      <span className="inline-flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-gray-400" /> Fecha
+                        emisión
+                      </span>
                     </label>
                     <input
                       type="date"
                       name="fecha_emision"
                       value={form.fecha_emision || ''}
                       onChange={handle}
-                      className="w-full rounded-xl border px-3 py-2"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-3 text-white
+                                 focus:outline-none focus:ring-2 focus:ring-cyan-300/40 focus:border-transparent"
                     />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium">
-                      Fecha vencimiento
+                  </motion.div>
+
+                  <motion.div variants={fieldV}>
+                    <label className="block text-sm font-medium text-gray-200 mb-2">
+                      <span className="inline-flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-gray-400" /> Fecha
+                        vencimiento
+                      </span>
                     </label>
                     <input
                       type="date"
                       name="fecha_vencimiento"
                       value={form.fecha_vencimiento || ''}
                       onChange={handle}
-                      className="w-full rounded-xl border px-3 py-2"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-3 text-white
+                                 focus:outline-none focus:ring-2 focus:ring-cyan-300/40 focus:border-transparent"
                     />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium">
-                      Cobro previsto
+                  </motion.div>
+
+                  <motion.div variants={fieldV}>
+                    <label className="block text-sm font-medium text-gray-2 00 mb-2">
+                      <span className="inline-flex items-center gap-2 text-white">
+                        <Calendar className="h-4 w-4 text-gray-400" /> Cobro
+                        previsto
+                      </span>
                     </label>
                     <input
                       type="date"
                       name="fecha_cobro_prevista"
                       value={form.fecha_cobro_prevista || ''}
                       onChange={handle}
-                      className="w-full rounded-xl border px-3 py-2"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-3 text-white
+                                 focus:outline-none focus:ring-2 focus:ring-cyan-300/40 focus:border-transparent"
                     />
-                  </div>
+                  </motion.div>
                 </div>
 
-                {/* Línea 5: referencias blandas */}
+                {/* Referencias blandas */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {form.tipo === 'recibido' ? (
                     <>
-                      <SearchableSelect
-                        label="Cliente"
-                        items={clientes}
-                        value={form.cliente_id}
-                        onChange={(id) =>
-                          setForm((f) => ({
-                            ...f,
-                            cliente_id: id ? Number(id) : ''
-                          }))
-                        }
-                        getOptionLabel={fmtTercero}
-                        getOptionValue={(c) => c?.id}
-                        getOptionSearchText={getTerceroSearchText} // ⬅️ permite buscar por DNI/CUIT/teléfono/etc.
-                        placeholder="Buscar cliente…"
-                        portal
-                      />
-                      <SearchableSelect
-                        label="Venta"
-                        items={ventas}
-                        value={form.venta_id}
-                        onChange={(id) =>
-                          setForm((f) => ({
-                            ...f,
-                            venta_id: id ? Number(id) : ''
-                          }))
-                        }
-                        getOptionLabel={labelVenta}
-                        getOptionValue={(v) => v?.id}
-                        getOptionSearchText={(v) =>
-                          getVentaSearchText(v, clientesIdx)
-                        }
-                        placeholder="Buscar venta…"
-                        portal
-                      />
+                      <motion.div variants={fieldV}>
+                        <label className="flex items-center gap-2 text-sm font-medium text-gray-200 mb-2">
+                          <User className="h-4 w-4 text-gray-400" />
+                          Cliente
+                        </label>
+                        <SearchableSelect
+                          items={clientes}
+                          value={form.cliente_id}
+                          onChange={(id) =>
+                            setForm((f) => ({
+                              ...f,
+                              cliente_id: id ? Number(id) : ''
+                            }))
+                          }
+                          getOptionLabel={fmtTercero}
+                          getOptionValue={(c) => c?.id}
+                          getOptionSearchText={getTerceroSearchText}
+                          placeholder="Buscar cliente…"
+                          portal
+                        />
+                      </motion.div>
+
+                      <motion.div variants={fieldV}>
+                        <label className="flex items-center gap-2 text-sm font-medium text-gray-200 mb-2">
+                          <ShoppingCart className="h-4 w-4 text-gray-400" />
+                          Venta
+                        </label>
+                        <SearchableSelect
+                          items={ventas}
+                          value={form.venta_id}
+                          onChange={(id) =>
+                            setForm((f) => ({
+                              ...f,
+                              venta_id: id ? Number(id) : ''
+                            }))
+                          }
+                          getOptionLabel={labelVenta}
+                          getOptionValue={(v) => v?.id}
+                          getOptionSearchText={(v) =>
+                            getVentaSearchText(v, clientesIdx)
+                          }
+                          placeholder="Buscar venta…"
+                          portal
+                        />
+                      </motion.div>
                     </>
                   ) : (
                     <>
-                      <SearchableSelect
-                        label="Proveedor"
-                        items={proveedores}
-                        value={form.proveedor_id}
-                        onChange={(id) =>
-                          setForm((f) => ({
-                            ...f,
-                            proveedor_id: id ? Number(id) : ''
-                          }))
-                        }
-                        getOptionLabel={fmtTercero}
-                        getOptionValue={(p) => p?.id}
-                        placeholder="Buscar proveedor…"
-                        portal
-                      />
-                      {/* placeholder para mantener grid en md */}
+                      <motion.div variants={fieldV}>
+                        <label className="flex items-center gap-2 text-sm font-medium text-gray-200 mb-2">
+                          <Factory className="h-4 w-4 text-gray-400" />
+                          Proveedor
+                        </label>
+                        <SearchableSelect
+                          items={proveedores}
+                          value={form.proveedor_id}
+                          onChange={(id) =>
+                            setForm((f) => ({
+                              ...f,
+                              proveedor_id: id ? Number(id) : ''
+                            }))
+                          }
+                          getOptionLabel={fmtTercero}
+                          getOptionValue={(p) => p?.id}
+                          placeholder="Buscar proveedor…"
+                          portal
+                        />
+                      </motion.div>
                       <div className="hidden md:block" />
                     </>
                   )}
                 </div>
 
-                {/* Línea 6: estado/motivo */}
+                {/* Estado / Motivo */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium">Estado</label>
+                  <motion.div variants={fieldV}>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-200 mb-2">
+                      <Tag className="h-4 w-4 text-gray-400" />
+                      Estado
+                    </label>
                     <select
                       name="estado"
                       value={form.estado}
                       onChange={handle}
-                      className="w-full rounded-xl border px-3 py-2"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-3 text-white
+                                 focus:outline-none focus:ring-2 focus:ring-cyan-300/40 focus:border-transparent"
                     >
                       {ESTADOS.map((e) => (
-                        <option key={e} value={e}>
+                        <option key={e} value={e} className="bg-gray-900">
                           {e}
                         </option>
                       ))}
                     </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium">
+                  </motion.div>
+
+                  <motion.div variants={fieldV}>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-200 mb-2">
+                      <MessageSquare className="h-4 w-4 text-gray-400" />
                       Motivo estado
                     </label>
                     <input
                       name="motivo_estado"
                       value={form.motivo_estado}
                       onChange={handle}
-                      className="w-full rounded-xl border px-3 py-2"
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-3 text-white
+                                 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-300/40 focus:border-transparent"
+                      placeholder="(No agregar nada aquí)"
                     />
-                  </div>
+                  </motion.div>
                 </div>
 
                 {/* Observaciones */}
-                <div>
-                  <label className="block text-sm font-medium">
+                <motion.div variants={fieldV}>
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-200 mb-2">
+                    <MessageSquare className="h-4 w-4 text-gray-400" />
                     Observaciones
                   </label>
                   <textarea
@@ -575,36 +722,42 @@ export default function ChequeFormModal({ open, onClose, onSubmit, initial }) {
                     value={form.observaciones}
                     onChange={handle}
                     rows={3}
-                    className="w-full rounded-xl border px-3 py-2"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-3 text-white
+                               placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-300/40 focus:border-transparent"
+                    placeholder="Notas internas…"
                   />
-                </div>
-              </form>
+                </motion.div>
+
+                {/* Acciones */}
+                <motion.div
+                  variants={fieldV}
+                  className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-1"
+                >
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-4 py-2 rounded-xl border border-white/10 text-gray-200 hover:bg-white/10 transition"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-500 text-white font-semibold
+                               hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed transition"
+                  >
+                    {saving
+                      ? 'Guardando…'
+                      : isEdit
+                      ? 'Guardar cambios'
+                      : 'Crear'}
+                  </button>
+                </motion.div>
+              </motion.form>
             </div>
 
-            {/* Footer sticky */}
-            <div className="flex flex-col sm:flex-row justify-end gap-2 px-4 sm:px-6 py-4 border-t bg-white sticky bottom-0">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 rounded-xl border text-gray-700 hover:bg-gray-50 w-full sm:w-auto"
-              >
-                Cancelar
-              </button>
-              <button
-                form="" // no hace falta; el botón está fuera del <form>, pero podemos manejarlo con JS:
-                onClick={(e) => {
-                  // dispara submit del form de arriba
-                  const formEl = e.currentTarget
-                    .closest('div[class*="flex"]')
-                    .previousElementSibling.querySelector('form');
-                  formEl?.requestSubmit();
-                }}
-                disabled={saving}
-                className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:opacity-60 w-full sm:w-auto"
-              >
-                {saving ? 'Guardando…' : isEdit ? 'Guardar cambios' : 'Crear'}
-              </button>
-            </div>
+            {/* Línea base metálica */}
+            <div className="absolute bottom-0 left-0 w-full h-[3px] bg-gradient-to-r from-gray-400/70 via-gray-200/70 to-gray-400/70 opacity-40 rounded-b-2xl" />
           </motion.div>
         </motion.div>
       )}
