@@ -33,6 +33,8 @@ import ConfirmDialog from '../../Components/Common/ConfirmDialog';
 import ChequeMovimientosTablePlus from './ChequeMovimientosTablePlus';
 import ChequeImagesManager from '../../Components/Cheques/ChequeImagesManager';
 
+import Swal from 'sweetalert2';
+
 const useDebounce = (value, ms = 400) => {
   const [deb, setDeb] = useState(value);
   useEffect(() => {
@@ -168,10 +170,49 @@ export default function ChequesCards() {
     setEditing(item);
     setModalOpen(true);
   };
+
   const onSubmit = async (payload) => {
-    if (editing?.id) await updateCheque(editing.id, payload);
-    else await createCheque(payload);
-    await fetchData();
+    try {
+      if (editing?.id) {
+        await updateCheque(editing.id, payload);
+        Swal.fire({
+          icon: 'success',
+          title: 'Cheque actualizado',
+          timer: 1400,
+          showConfirmButton: false
+        });
+      } else {
+        await createCheque(payload);
+        Swal.fire({
+          icon: 'success',
+          title: 'Cheque creado',
+          timer: 1400,
+          showConfirmButton: false
+        });
+      }
+      await fetchData();
+    } catch (err) {
+      // err = { ok:false, code, mensajeError, tips?, details? } (por el interceptor)
+      const title = err?.mensajeError || 'No se pudo guardar';
+      const tipsHtml =
+        Array.isArray(err?.tips) && err.tips.length
+          ? `<ul style="text-align:left;padding-left:18px;margin:0">${err.tips
+              .map((t) => `<li>${t}</li>`)
+              .join('')}</ul>`
+          : '';
+      await Swal.fire({
+        icon: 'error',
+        title,
+        html: tipsHtml || undefined,
+        confirmButtonText: 'Entendido'
+      });
+
+      if (err?.details?.field) {
+        const el = document.querySelector(`[name="${err.details.field}"]`);
+        el?.focus?.();
+      }
+      throw err;
+    }
   };
 
   const onAskDelete = (item) => {
@@ -182,9 +223,94 @@ export default function ChequesCards() {
     try {
       await deleteCheque(toDelete.id);
       setRows((r) => r.filter((x) => x.id !== toDelete.id));
-    } catch (e) {
-      console.error(e);
-      alert('No se pudo eliminar');
+      Swal.fire({
+        icon: 'success',
+        title: 'Cheque eliminado',
+        timer: 1200,
+        showConfirmButton: false
+      });
+    } catch (err) {
+      // 409 con movimientos de cheque: ofrecer "forzar" (anula)
+      if (err?.code === 'TIENE_MOV_CHEQUE') {
+        const { isConfirmed } = await Swal.fire({
+          icon: 'warning',
+          title: err.mensajeError || 'Tiene movimientos',
+          html: `<p>Si continuás, el cheque se <b>ANULARÁ</b> (no se elimina físicamente).</p>
+               ${
+                 Array.isArray(err.tips)
+                   ? `<ul style="text-align:left;padding-left:18px">${err.tips
+                       .map((t) => `<li>${t}</li>`)
+                       .join('')}</ul>`
+                   : ''
+               }`,
+          showCancelButton: true,
+          confirmButtonText: 'Anular igualmente',
+          cancelButtonText: 'Cancelar'
+        });
+        if (isConfirmed) {
+          try {
+            await deleteCheque(toDelete.id, { forzar: true });
+            setRows((r) =>
+              r.map((x) =>
+                x.id === toDelete.id ? { ...x, estado: 'anulado' } : x
+              )
+            );
+            Swal.fire({
+              icon: 'success',
+              title: 'Cheque anulado',
+              timer: 1400,
+              showConfirmButton: false
+            });
+          } catch (err2) {
+            const title2 = err2?.mensajeError || 'No se pudo anular';
+            const tips2 =
+              Array.isArray(err2?.tips) && err2.tips.length
+                ? `<ul style="text-align:left;padding-left:18px">${err2.tips
+                    .map((t) => `<li>${t}</li>`)
+                    .join('')}</ul>`
+                : '';
+            await Swal.fire({
+              icon: 'error',
+              title: title2,
+              html: tips2 || undefined,
+              confirmButtonText: 'Entendido'
+            });
+          }
+        }
+        return;
+      }
+
+      // 409 con mov. bancarios: no se puede eliminar; mostrar tips
+      if (err?.code === 'TIENE_MOV_BANCARIOS') {
+        const tipsHtml =
+          Array.isArray(err?.tips) && err.tips.length
+            ? `<ul style="text-align:left;padding-left:18px">${err.tips
+                .map((t) => `<li>${t}</li>`)
+                .join('')}</ul>`
+            : '';
+        await Swal.fire({
+          icon: 'error',
+          title: err.mensajeError || 'No se puede eliminar',
+          html: tipsHtml || undefined,
+          confirmButtonText: 'Entendido'
+        });
+        return;
+      }
+
+      // Otros errores
+      const title = err?.mensajeError || 'No se pudo eliminar';
+      const tipsHtml =
+        Array.isArray(err?.tips) && err.tips.length
+          ? `<ul style="text-align:left;padding-left:18px">${err.tips
+              .map((t) => `<li>${t}</li>`)
+              .join('')}</ul>`
+          : '';
+      await Swal.fire({
+        icon: 'error',
+        title,
+        html: tipsHtml || undefined,
+        confirmButtonText: 'Entendido'
+      });
     } finally {
       setConfirmOpen(false);
       setToDelete(null);

@@ -16,7 +16,6 @@ client.interceptors.request.use((config) => {
 
   const method = (config.method || 'get').toLowerCase();
 
-  // Helpers de merge sin pisar si ya viene seteado
   const ensureBodyWithUser = () => {
     if (config.data instanceof FormData) {
       if (!config.data.has('usuario_log_id'))
@@ -27,7 +26,7 @@ client.interceptors.request.use((config) => {
       if (!('usuario_log_id' in body)) {
         config.data = { ...body, usuario_log_id: uid };
       } else {
-        config.data = body; // respeta el valor existente
+        config.data = body;
       }
     }
   };
@@ -43,21 +42,41 @@ client.interceptors.request.use((config) => {
   };
 
   if (method === 'get' || method === 'head' || method === 'delete') {
-    // Para GET/HEAD/DELETE lo pasamos como querystring (nuestros controladores lo aceptan)
     ensureParamsWithUser();
   } else {
-    // Para POST/PUT/PATCH lo pasamos en el body (o FormData)
     ensureBodyWithUser();
   }
 
   return config;
 });
 
+/** 🔥 Interceptor de respuesta: normaliza errores del backend y de red */
+client.interceptors.response.use(
+  (resp) => resp, // todo 2xx pasa
+  (error) => {
+    // Si el backend ya manda { ok:false, code, mensajeError, tips, details }, propágalo tal cual
+    const std = error?.response?.data;
+    if (std && (std.mensajeError || std.code || std.ok === false)) {
+      return Promise.reject(std);
+    }
+    // Errores de red / CORS / timeout
+    return Promise.reject({
+      ok: false,
+      code: 'NETWORK',
+      mensajeError: 'No se pudo conectar con el servidor',
+      tips: ['Verificá tu conexión y reintentá.'],
+      details: {
+        status: error?.response?.status ?? null,
+        reason: error?.message ?? 'desconocido'
+      }
+    });
+  }
+);
+
 /* =============================
    Endpoints Bancos
    ============================= */
 export const listBancos = async (params = {}) => {
-  // soporta: page, limit, q, activo, orderBy, orderDir
   const { data } = await client.get('/bancos', { params });
   return data;
 };

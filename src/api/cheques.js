@@ -1,64 +1,55 @@
 // src/api/cheques.js
-import { client } from './bancos'; // ya trae baseURL e interceptor con usuario_log_id
+import { client } from './bancos'; // trae baseURL e interceptores
+
+// Helper fino para acortar
+const ok = (p) => p.then((r) => r.data);
 
 // Listado (filtros opcionales)
-export const listCheques = async (params = {}) => {
-  const { data } = await client.get('/cheques', { params });
-  return data;
-};
+export const listCheques = (params = {}) =>
+  ok(client.get('/cheques', { params }));
 
-export const getCheque = async (id) => {
-  const { data } = await client.get(`/cheques/${id}`);
-  return data;
-};
+export const getCheque = (id) => ok(client.get(`/cheques/${id}`));
 
-// payload: { tipo, canal, banco_id?, chequera_id?, numero, monto, fechas..., refs blandas..., beneficiario_nombre?, observaciones? }
-export const createCheque = async (payload) => {
-  const { data } = await client.post('/cheques', payload);
-  return data;
-};
+// payload: { tipo, canal, banco_id?, chequera_id?, numero, monto, fechas..., refs..., beneficiario_nombre?, observaciones? }
+export const createCheque = (payload) => ok(client.post('/cheques', payload));
 
-export const updateCheque = async (id, payload) => {
-  const { data } = await client.patch(`/cheques/${id}`, payload);
-  return data;
-};
+export const updateCheque = (id, payload) =>
+  ok(client.patch(`/cheques/${id}`, payload));
 
-export const deleteCheque = async (id) => {
-  const { data } = await client.delete(`/cheques/${id}`);
-  return data;
-};
+/**
+ * Delete / Anular según reglas del backend:
+ * - Si tiene movimientos bancarios => 409 TIENE_MOV_BANCARIOS (no elimina)
+ * - Si tiene movimientos de cheque => 409 TIENE_MOV_CHEQUE (pedir forzar)
+ * - Si forzar=true => ANULA (estado='anulado'), no elimina físicamente
+ */
+export const deleteCheque = (
+  id,
+  { forzar = false, usuario_log_id = null } = {}
+) =>
+  ok(
+    client.delete(`/cheques/${id}`, {
+      params: { forzar }, // ?forzar=true|false
+      data: usuario_log_id ? { usuario_log_id } : undefined // body opcional en DELETE (Axios lo soporta)
+    })
+  );
 
 /* ========================
  * Transiciones de estado
  * ======================*/
-export const depositarCheque = async (id, payload = {}) => {
-  const { data } = await client.patch(`/cheques/${id}/depositar`, payload);
-  return data;
-};
-export const acreditarCheque = async (id, payload = {}) => {
-  const { data } = await client.patch(`/cheques/${id}/acreditar`, payload);
-  return data;
-};
-export const rechazarCheque = async (id, payload = {}) => {
-  const { data } = await client.patch(`/cheques/${id}/rechazar`, payload);
-  return data;
-};
-export const aplicarProveedorCheque = async (id, payload = {}) => {
-  const { data } = await client.patch(
-    `/cheques/${id}/aplicar-a-proveedor`,
-    payload
-  );
-  return data;
-};
-export const entregarCheque = async (id, payload = {}) => {
-  const { data } = await client.patch(`/cheques/${id}/entregar`, payload);
-  return data;
-};
-export const compensarCheque = async (id, payload = {}) => {
-  const { data } = await client.patch(`/cheques/${id}/compensar`, payload);
-  return data;
-};
-export const anularCheque = async (id, payload = {}) => {
-  const { data } = await client.patch(`/cheques/${id}/anular`, payload);
-  return data;
-};
+const transition = (id, path, payload = {}) =>
+  ok(client.patch(`/cheques/${id}/${path}`, payload));
+
+export const depositarCheque = (id, payload = {}) =>
+  transition(id, 'depositar', payload);
+export const acreditarCheque = (id, payload = {}) =>
+  transition(id, 'acreditar', payload);
+export const rechazarCheque = (id, payload = {}) =>
+  transition(id, 'rechazar', payload);
+export const aplicarProveedorCheque = (id, payload = {}) =>
+  transition(id, 'aplicar-a-proveedor', payload);
+export const entregarCheque = (id, payload = {}) =>
+  transition(id, 'entregar', payload);
+export const compensarCheque = (id, payload = {}) =>
+  transition(id, 'compensar', payload);
+export const anularCheque = (id, payload = {}) =>
+  transition(id, 'anular', payload);
