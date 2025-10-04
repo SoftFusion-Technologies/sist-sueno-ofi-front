@@ -24,11 +24,19 @@ export const updateBancoMovimiento = async (id, payload) => {
   return data;
 };
 
+/* Eliminar (duro) */
 export const deleteBancoMovimiento = async (id) => {
   const { data } = await client.delete(`/banco-movimientos/${id}`);
   return data;
 };
 
+/* Eliminar forzando (si está vinculado a cheque) */
+export const deleteBancoMovimientoForzado = async (id) => {
+  const { data } = await client.delete(`/banco-movimientos/${id}`, {
+    params: { forzar: 1 }
+  });
+  return data;
+};
 // Extras opcionales del backend (KPIs/Export)
 export const getSaldoCuenta = async (bancoCuentaId, hasta) => {
   const { data } = await client.get(`/banco-cuentas/${bancoCuentaId}/saldo`, {

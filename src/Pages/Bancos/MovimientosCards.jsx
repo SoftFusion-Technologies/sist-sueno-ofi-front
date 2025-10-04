@@ -17,8 +17,17 @@ import {
   deleteBancoMovimiento,
   exportMovimientosCSV,
   getSaldoCuenta,
-  getResumenCuenta
+  getResumenCuenta,
+  deleteBancoMovimientoForzado
 } from '../../api/bancosmovimientos';
+
+import {
+  showSuccessSwal,
+  showWarnSwal,
+  showErrorSwal,
+  showConfirmSwal,
+  showApiErrorSwal
+} from '../../ui/swal';
 
 import BankMovementCard from '../../Components/Bancos/BankMovementCard';
 import BankMovementFormModal from '../../Components/Bancos/BankMovementFormModal';
@@ -173,19 +182,73 @@ export default function MovimientosCards() {
     setEditing(item);
     setModalOpen(true);
   };
-  const onSubmit = async (payload) => {
-    if (editing?.id) {
-      await updateBancoMovimiento(editing.id, payload);
-    } else {
-      await createBancoMovimiento(payload);
+  // Crear / editar
+  const onSubmit = async (form) => {
+    try {
+      if (editing?.id) {
+        await updateBancoMovimiento(editing.id, form);
+        await showSuccessSwal(
+          'Movimiento actualizado',
+          'Se guardaron los cambios.'
+        );
+      } else {
+        await createBancoMovimiento(form);
+        await showSuccessSwal(
+          'Movimiento creado',
+          'Se registró el movimiento.'
+        );
+      }
+      await fetchData();
+      setEditing(null);
+      setModalOpen(false);
+    } catch (e) {
+      // muestra mensaje + tips + details
+      await showApiErrorSwal(e, { title: 'No se pudo guardar' });
     }
-    await fetchData();
   };
 
-  const onAskDelete = (item) => {
-    setToDelete(item);
-    setConfirmOpen(true);
+  // Eliminar (respeta bloqueo por cheque y permite forzar)
+  const onAskDelete = async (row) => {
+    const ok = await showConfirmSwal(
+      'Eliminar movimiento',
+      '¿Seguro que desea eliminar este movimiento?'
+    );
+    if (!ok) return;
+
+    try {
+      await deleteBancoMovimiento(row.id);
+      setRows((r) => r.filter((x) => x.id !== row.id));
+      await showSuccessSwal(
+        'Movimiento eliminado',
+        'Se eliminó correctamente.'
+      );
+    } catch (e) {
+      if (e?.code === 'CHEQUE_LINKED') {
+        const okForzar = await showConfirmSwal({
+          title: 'Vinculado a cheque',
+          html: `${e.mensajeError}${e.tips?.length ? '<br/>' : ''}`,
+          confirmText: 'Eliminar de todas formas',
+          cancelText: 'Cancelar',
+          icon: 'warning'
+        });
+        if (!okForzar) return;
+
+        try {
+          await deleteBancoMovimientoForzado(row.id);
+          setRows((r) => r.filter((x) => x.id !== row.id));
+          await showSuccessSwal(
+            'Movimiento eliminado',
+            'Se eliminó correctamente.'
+          );
+        } catch (e2) {
+          await showApiErrorSwal(e2, { title: 'No se pudo eliminar' });
+        }
+      } else {
+        await showApiErrorSwal(e, { title: 'No se pudo eliminar' });
+      }
+    }
   };
+  
   const onConfirmDelete = async () => {
     try {
       await deleteBancoMovimiento(toDelete.id);
@@ -487,7 +550,6 @@ export default function MovimientosCards() {
                   )}
                 </div>
               )}
-            
             </div>
           )}
           {/* Grid */}
