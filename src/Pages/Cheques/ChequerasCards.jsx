@@ -144,20 +144,24 @@ export default function ChequerasCards() {
   };
 
   // Crear / Editar con manejo de 409 RANGO_SUPERPUESTO (con sugerencia)
-  const onSubmit = async (payload) => {
+  const onSubmit = async (payload, { silent = false } = {}) => {
     try {
       if (editing?.id) {
         await updateChequera(editing.id, payload);
-        await showSuccessSwal({
-          title: 'Actualizada',
-          text: 'Chequera actualizada correctamente.'
-        });
+        if (!silent) {
+          await showSuccessSwal({
+            title: 'Actualizada',
+            text: 'Chequera actualizada correctamente.'
+          });
+        }
       } else {
         await createChequera(payload);
-        await showSuccessSwal({
-          title: 'Creada',
-          text: 'Chequera creada correctamente.'
-        });
+        if (!silent) {
+          await showSuccessSwal({
+            title: 'Creada',
+            text: 'Chequera creada correctamente.'
+          });
+        }
       }
       setModalOpen(false);
       setEditing(null);
@@ -176,7 +180,7 @@ export default function ChequerasCards() {
         });
         if (!ok) return;
 
-        // Reintenta creándola con la sugerencia (auto=true)
+        // Reintento con sugerencia
         try {
           await createChequera({
             ...payload,
@@ -185,10 +189,12 @@ export default function ChequerasCards() {
             proximo_nro: s.proximo_nro ?? s.nro_desde,
             auto: true
           });
-          await showSuccessSwal({
-            title: 'Creada',
-            text: 'Chequera creada con rango sugerido.'
-          });
+          if (!silent) {
+            await showSuccessSwal({
+              title: 'Creada',
+              text: 'Chequera creada con rango sugerido.'
+            });
+          }
           setModalOpen(false);
           setEditing(null);
           await fetchData();
@@ -201,7 +207,7 @@ export default function ChequerasCards() {
         return;
       }
 
-      // Otros errores normalizados
+      // Otros errores
       await showApiErrorSwal(e, {
         fallbackTitle: 'Error',
         fallbackText: 'No se pudo guardar la chequera.'

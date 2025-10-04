@@ -16,7 +16,6 @@ import {
 } from '../../ui/animHelpers';
 import { X, CreditCard, Building2, Book, Hash, ArrowRight } from 'lucide-react';
 
-
 const ESTADOS = ['activa', 'agotada', 'bloqueada', 'anulada'];
 
 function getAxiosMsg(err) {
@@ -184,80 +183,17 @@ export default function ChequeraFormModal({
 
     try {
       setSaving(true);
-      await onSubmit(basePayload);
-
-      await Swal.fire({
-        icon: 'success',
-        title: hasProx ? 'Chequera guardada' : 'Chequera creada',
-        text: `Rango ${desde}–${hasta}`
-      });
-
-      onClose();
-    } catch (rawErr) {
-      const err = pickErr(rawErr);
-
-      // Caso especial: superposición con sugerencia
-      if (err.code === 'RANGO_SUPERPUESTO' && err.details?.suggestion) {
-        const s = err.details.suggestion; // { nro_desde, nro_hasta, proximo_nro }
-        const { isConfirmed } = await Swal.fire({
-          icon: 'warning',
-          title: err.mensajeError || 'Rango en conflicto',
-          html: `
-          <p style="margin:0 0 8px">Rango pedido: <b>${
-            err.details?.requested?.nro_desde
-          }–${err.details?.requested?.nro_hasta}</b></p>
-          <p style="margin:0 0 8px">Rango sugerido: <b>${s.nro_desde}–${
-            s.nro_hasta
-          }</b></p>
-          ${tipsHtml(err.tips)}
-          <p style="margin-top:8px">¿Querés usar el rango sugerido?</p>
-        `,
-          showCancelButton: true,
-          confirmButtonText: 'Usar sugerido',
-          cancelButtonText: 'Editar'
-        });
-
-        if (isConfirmed) {
-          try {
-            // Reintento con auto=true aplicando sugerencia
-            await onSubmit({
-              ...basePayload,
-              nro_desde: s.nro_desde,
-              nro_hasta: s.nro_hasta,
-              proximo_nro: s.proximo_nro ?? s.nro_desde,
-              auto: true
-            });
-
-            await Swal.fire({
-              icon: 'success',
-              title: 'Chequera creada con rango sugerido',
-              text: `Rango ${s.nro_desde}–${s.nro_hasta}`
-            });
-
-            onClose();
-          } catch (rawErr2) {
-            const err2 = pickErr(rawErr2);
-            await Swal.fire({
-              icon: 'error',
-              title:
-                err2.mensajeError || 'No se pudo crear con el rango sugerido',
-              html: tipsHtml(err2.tips) || undefined
-            });
-          }
-        }
-        return;
-      }
-
-      // Otros errores normalizados
-      await Swal.fire({
-        icon: 'error',
-        title: err.mensajeError || 'Error',
-        html: tipsHtml(err.tips) || undefined
-      });
+      // onSubmit ya maneja éxito, 409 con sugerencia y errores (Swal internos)
+      await onSubmit(basePayload); // o await onSubmit(basePayload, { silent: false })
+      onClose(); // si onSubmit ya cierra modal, podés omitir este onClose()
+    } catch /* err */ {
+      // No mostramos nada acá: onSubmit ya mostró el Swal correspondiente.
+      // Si querés un fallback ultra-defensivo, podrías loguear el error.
     } finally {
       setSaving(false);
     }
   };
+
   const titleId = useId();
 
   // Cálculos preview
