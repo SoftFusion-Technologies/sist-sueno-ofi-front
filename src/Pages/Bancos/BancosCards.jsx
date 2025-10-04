@@ -19,6 +19,13 @@ import {
   deleteBanco
 } from '../../api/bancos';
 
+import {
+  showErrorSwal,
+  showWarnSwal,
+  showSuccessSwal,
+  showConfirmSwal
+} from '../../ui/swal';
+
 const useDebounce = (value, ms = 400) => {
   const [deb, setDeb] = useState(value);
   useEffect(() => {
@@ -89,25 +96,78 @@ export default function BancosCards() {
   };
 
   const onSubmit = async (form) => {
-    if (editing?.id) {
-      await updateBanco(editing.id, form);
-    } else {
-      await createBanco(form);
-      // si tu backend exige nombre único, capturar 409
+    try {
+      if (editing?.id) {
+        await updateBanco(editing.id, form);
+        await showSuccessSwal({ title: 'Guardado', text: 'Banco actualizado' });
+      } else {
+        await createBanco(form);
+        await showSuccessSwal({ title: 'Creado', text: 'Banco creado' });
+      }
+      await fetchData();
+      onClose();
+    } catch (err) {
+      // err YA VIENE normalizado por el interceptor
+      const { code, mensajeError, tips } = err || {};
+
+      if (code === 'DUPLICATE') {
+        return showErrorSwal({
+          title: 'Nombre en uso',
+          text: mensajeError || 'Ya existe un banco con ese nombre.',
+          tips: tips?.length ? tips : ['Usá un nombre distinto.']
+        });
+      }
+
+      if (code === 'MODEL_VALIDATION' || code === 'BAD_REQUEST') {
+        return showWarnSwal({
+          title: 'Datos inválidos',
+          text: mensajeError || 'Revisá los campos del formulario.',
+          tips
+        });
+      }
+
+      if (code === 'NETWORK') {
+        return showErrorSwal({
+          title: 'Sin conexión',
+          text: mensajeError,
+          tips
+        });
+      }
+
+      // Fallback
+      return showErrorSwal({
+        title: 'No se pudo guardar',
+        text: mensajeError || 'Ocurrió un error inesperado',
+        tips
+      });
     }
-    await fetchData();
   };
 
   const onToggleActivo = async (item) => {
+    const next = !item.activo;
+
+    // Optimista
+    setRows((r) =>
+      r.map((x) => (x.id === item.id ? { ...x, activo: next } : x))
+    );
+
     try {
-      await updateBanco(item.id, { activo: !item.activo });
-      // Optimista:
+      await updateBanco(item.id, { activo: next });
+      await showSuccessSwal({
+        title: next ? 'Activado' : 'Desactivado',
+        text: `Banco ${next ? 'activado' : 'desactivado'}`
+      });
+    } catch (err) {
+      // Rollback
       setRows((r) =>
-        r.map((x) => (x.id === item.id ? { ...x, activo: !x.activo } : x))
+        r.map((x) => (x.id === item.id ? { ...x, activo: !next } : x))
       );
-    } catch (e) {
-      console.error(e);
-      alert('No se pudo actualizar el estado');
+      const { mensajeError, tips } = err || {};
+      await showErrorSwal({
+        title: 'No se pudo actualizar',
+        text: mensajeError || 'Error al cambiar el estado',
+        tips
+      });
     }
   };
 
@@ -116,14 +176,71 @@ export default function BancosCards() {
     setConfirmOpen(true);
   };
   const onConfirmDelete = async () => {
+    const item = toDelete;
+    setConfirmOpen(false);
+
+    // Confirmación inicial
+    const res = await showConfirmSwal({
+      title: '¿Eliminar banco?',
+      text: `Se eliminará "${item?.nombre}". Esta acción no se puede deshacer.`,
+      confirmText: 'Sí, eliminar'
+    });
+    if (!res.isConfirmed) return;
+
     try {
-      await deleteBanco(toDelete.id);
-      setRows((r) => r.filter((x) => x.id !== toDelete.id));
-    } catch (e) {
-      console.error(e);
-      alert('No se pudo eliminar (verifique dependencias)');
+      await deleteBanco(item.id); // intento de borrado duro
+      setRows((r) => r.filter((x) => x.id !== item.id));
+      await showSuccessSwal({ title: 'Eliminado', text: 'Banco eliminado' });
+    } catch (err) {
+      const { code, mensajeError, tips, details } = err || {};
+
+      if (code === 'HAS_DEPENDENCIES') {
+        // Proponer desactivar
+        const res2 = await showConfirmSwal({
+          icon: 'warning',
+          title: 'Tiene cuentas asociadas',
+          text:
+            (mensajeError ||
+              'Este BANCO tiene cuentas asociadas. ¿Desea desactivarlo?') +
+            (details?.cuentasAsociadas
+              ? `<br/><br/>Cuentas asociadas: <b>${details.cuentasAsociadas}</b>`
+              : ''),
+          confirmText: 'Desactivar',
+          cancelText: 'Cancelar'
+        });
+
+        if (res2.isConfirmed) {
+          try {
+            await deleteBanco(item.id, { forzar: true }); // 🔸 importante
+            // No sacamos la fila; lo marcamos inactivo
+            setRows((r) =>
+              r.map((x) => (x.id === item.id ? { ...x, activo: false } : x))
+            );
+            await showSuccessSwal({
+              title: 'Desactivado',
+              text: 'El banco fue desactivado (posee dependencias).'
+            });
+          } catch (err2) {
+            const { mensajeError: m2, tips: t2 } = err2 || {};
+            await showErrorSwal({
+              title: 'No se pudo desactivar',
+              text: m2 || 'Error al desactivar',
+              tips: t2
+            });
+          }
+        }
+
+        setToDelete(null);
+        return;
+      }
+
+      // Otros errores
+      await showErrorSwal({
+        title: 'No se pudo eliminar',
+        text: mensajeError || 'Ocurrió un error al eliminar',
+        tips
+      });
     } finally {
-      setConfirmOpen(false);
       setToDelete(null);
     }
   };
@@ -170,9 +287,7 @@ export default function BancosCards() {
             >
               Bancos
             </motion.h1>
-            <p className="text-white/80">
-              Gestioná entidades bancarias.
-            </p>
+            <p className="text-white/80">Gestioná entidades bancarias.</p>
           </div>
 
           {/* Barra de acciones */}

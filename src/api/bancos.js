@@ -96,7 +96,9 @@ export const updateBanco = async (id, payload) => {
   return data;
 };
 
-export const deleteBanco = async (id) => {
-  const { data } = await client.delete(`/bancos/${id}`);
+
+export const deleteBanco = async (id, params = {}) => {
+  // lo mandamos por querystring; tu backend lo acepta por query o body
+  const { data } = await client.delete(`/bancos/${id}`, { params });
   return data;
 };
