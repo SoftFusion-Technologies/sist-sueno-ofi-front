@@ -21,6 +21,14 @@ import {
   deleteBancoCuenta
 } from '../../api/bancoCuentas';
 
+import {
+  showErrorSwal,
+  showWarnSwal,
+  showSuccessSwal,
+  showConfirmSwal,showApiErrorSwal
+} from '../../ui/swal';
+
+
 const useDebounce = (value, ms = 400) => {
   const [deb, setDeb] = useState(value);
   useEffect(() => {
@@ -47,8 +55,8 @@ export default function CuentasCards() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [toDelete, setToDelete] = useState(null);
+  // const [confirmOpen, setConfirmOpen] = useState(false);
+  // const [toDelete, setToDelete] = useState(null);
 
   const [viewOpen, setViewOpen] = useState(false);
   const [viewing, setViewing] = useState(null);
@@ -102,16 +110,36 @@ export default function CuentasCards() {
     setEditing(item);
     setModalOpen(true);
   };
-
   const onSubmit = async (form) => {
-    if (editing?.id) {
-      await updateBancoCuenta(editing.id, form);
-    } else {
-      await createBancoCuenta(form);
+    try {
+      if (editing?.id) {
+        await updateBancoCuenta(editing.id, form);
+        await showSuccessSwal(
+          'Cuenta actualizada',
+          'Los cambios se guardaron correctamente.'
+        );
+      } else {
+        await createBancoCuenta(form);
+        await showSuccessSwal('Cuenta creada', 'Se creó la cuenta bancaria.');
+      }
+      await fetchData();
+      setEditing(null);
+    } catch (e) {
+      // gracias al interceptor, `e` ya viene normalizado: { ok:false, code, mensajeError, tips?, details? }
+      if (e?.code === 'DUPLICATE' || e?.code === 'CONFLICT') {
+        await showWarnSwal(
+          'Dato duplicado',
+          e.mensajeError || 'La cuenta ya existe.'
+        );
+      } else if (e?.code) {
+        await showErrorSwal('Error', e.mensajeError || 'No se pudo guardar.');
+      } else {
+        await showErrorSwal('Error', 'No se pudo conectar con el servidor.');
+      }
     }
-    await fetchData();
   };
 
+  // TOGGLE ACTIVO
   const onToggleActivo = async (item) => {
     try {
       await updateBancoCuenta(item.id, { activo: !item.activo });
@@ -119,25 +147,59 @@ export default function CuentasCards() {
         r.map((x) => (x.id === item.id ? { ...x, activo: !x.activo } : x))
       );
     } catch (e) {
-      console.error(e);
-      alert('No se pudo actualizar el estado');
+      await showErrorSwal(
+        'No se pudo actualizar',
+        e?.mensajeError || 'Intente nuevamente.'
+      );
     }
   };
 
-  const onAskDelete = (item) => {
-    setToDelete(item);
-    setConfirmOpen(true);
-  };
-  const onConfirmDelete = async () => {
+  // ELIMINAR (con confirmación y fallback a desactivar si hay dependencias)
+  const onAskDelete = async (item) => {
+    const ok = await showConfirmSwal(
+      'Eliminar cuenta bancaria',
+      `¿Seguro que desea eliminar "${item.nombre_cuenta}"?`
+    );
+    if (!ok) return;
+
     try {
-      await deleteBancoCuenta(toDelete.id);
-      setRows((r) => r.filter((x) => x.id !== toDelete.id));
+      await deleteBancoCuenta(item.id); // intento de eliminación dura
+      setRows((r) => r.filter((x) => x.id !== item.id));
+      await showSuccessSwal(
+        'Cuenta eliminada',
+        'La cuenta bancaria fue eliminada.'
+      );
     } catch (e) {
-      console.error(e);
-      alert('No se pudo eliminar (verifique dependencias)');
-    } finally {
-      setConfirmOpen(false);
-      setToDelete(null);
+      // Si hay dependencias, el backend devuelve 409 con codes HAS_MOVEMENTS / HAS_CHEQUERAS
+      if (e?.code === 'HAS_MOVEMENTS' || e?.code === 'HAS_CHEQUERAS') {
+        const desc = e?.mensajeError || 'La cuenta posee dependencias.';
+        const okForzar = await showConfirmSwal(
+          'No se puede eliminar',
+          `${desc}\n\n¿Desea DESACTIVARLA de todas formas?`
+        );
+        if (!okForzar) return;
+
+        try {
+          await deleteBancoCuenta(item.id, { forzar: 1 }); // desactivar
+          // reflejar inactivo en la grilla (no la quitamos)
+          setRows((r) =>
+            r.map((x) => (x.id === item.id ? { ...x, activo: false } : x))
+          );
+          await showSuccessSwal(
+            'Cuenta desactivada',
+            'La cuenta fue desactivada correctamente.'
+          );
+        } catch (e2) {
+          await showErrorSwal(
+            'No se pudo desactivar',
+            e2?.mensajeError || 'Intente nuevamente.'
+          );
+        }
+      } else if (e?.code) {
+        await showErrorSwal('Error', e.mensajeError || 'No se pudo eliminar.');
+      } else {
+        await showErrorSwal('Error', 'No se pudo conectar con el servidor.');
+      }
     }
   };
 
@@ -284,10 +346,7 @@ export default function CuentasCards() {
                     }}
                     onEdit={(row) => onEdit(row)}
                     onToggleActivo={onToggleActivo}
-                    onDelete={(row) => {
-                      setToDelete(row);
-                      setConfirmOpen(true);
-                    }}
+                    onDelete={(row) => onAskDelete(row)} // ✅ solo esto
                   />
                 ))}
               </div>
@@ -313,22 +372,23 @@ export default function CuentasCards() {
         bancoNombre={viewing ? nombreBanco(viewing.banco_id) : ''}
       />
 
-      <ConfirmDialog
-        open={confirmOpen}
-        title="Eliminar cuenta bancaria"
-        message={
-          toDelete
-            ? `¿Seguro que desea eliminar "${toDelete.nombre_cuenta}"?`
-            : ''
-        }
-        onCancel={() => setConfirmOpen(false)}
-        onConfirm={async () => {
-          await deleteBancoCuenta(toDelete.id);
-          setRows((r) => r.filter((x) => x.id !== toDelete.id));
-          setConfirmOpen(false);
-          setToDelete(null);
-        }}
-      />
+      {/* <ConfirmDialog 
+      //   open={confirmOpen}
+      //   title="Eliminar cuenta bancaria"
+      //   message={
+      //     toDelete
+      //       ? `¿Seguro que desea eliminar "${toDelete.nombre_cuenta}"?`
+      //       : ''
+      //   }
+      //   onCancel={() => setConfirmOpen(false)}
+      //   onConfirm={async () => {
+      //     await deleteBancoCuenta(toDelete.id);
+      //     setRows((r) => r.filter((x) => x.id !== toDelete.id));
+      //     setConfirmOpen(false);
+      //     setToDelete(null);
+      //   }}
+      // />
+      */}
     </>
   );
 }

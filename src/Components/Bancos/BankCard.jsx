@@ -109,7 +109,7 @@ export default function BankCard({
             <span className="text-xl font-black text-zinc-900 dark:text-white">
               {initial}
             </span>
-            <FaUniversity className="absolute -right-2 -bottom-2 text-zinc-400/60 dark:text-zinc-500" />
+            <FaUniversity className="absolute -right-2 -bottom-2 text-white " />
           </div>
           <div className="min-w-0">
             <div className="flex items-center justify-between gap-2">

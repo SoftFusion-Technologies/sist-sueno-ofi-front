@@ -23,7 +23,9 @@ export const updateBancoCuenta = async (id, payload) => {
   return data;
 };
 
-export const deleteBancoCuenta = async (id) => {
-  const { data } = await client.delete(`/banco-cuentas/${id}`);
+export const deleteBancoCuenta = async (id, opts = {}) => {
+  const { data } = await client.delete(`/banco-cuentas/${id}`, {
+    params: opts
+  });
   return data;
 };
