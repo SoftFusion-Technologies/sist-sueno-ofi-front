@@ -1,6 +1,5 @@
-// src/Components/Bancos/BankAccountCard.jsx
-import React from 'react';
-import { motion } from 'framer-motion';
+import React, { useMemo, useState } from 'react';
+import { motion, useMotionValue, useTransform } from 'framer-motion';
 import {
   FaWallet,
   FaCheckCircle,
@@ -13,27 +12,66 @@ import {
   FaEye
 } from 'react-icons/fa';
 
-const ChipActivo = ({ active }) => (
+/**
+ * BankAccountCard (v3 • "HoloCard")
+ * ------------------------------------------------------------------
+ * • Look & feel: tarjeta bancaria/holográfica con glass + brillo diagonal.
+ * • Microinteracciones: tilt 3D, ripples sutiles, botones icon-only con tooltip.
+ * • Acciones compatibles: onView, onEdit, onToggleActivo, onDelete.
+ * • Accesible, responsive, dark-mode friendly.
+ * • Sin dependencias nuevas (solo framer-motion + react-icons + tailwind).
+ *
+ * Drop-in replacement del componente original.
+ */
+
+const Chip = ({ active }) => (
   <span
-    className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full
-    ${active ? 'bg-teal-100 text-teal-700' : 'bg-gray-200 text-gray-700'}`}
+    className={`inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded-full border
+    ${
+      active
+        ? 'bg-emerald-100/70 text-emerald-800 border-emerald-300'
+        : 'bg-zinc-200/70 text-zinc-700 border-zinc-300 dark:bg-zinc-800/60 dark:text-zinc-200 dark:border-zinc-700'
+    }
+  `}
   >
-    {active ? <FaCheckCircle /> : <FaTimesCircle />}
+    {active ? (
+      <FaCheckCircle className="shrink-0" />
+    ) : (
+      <FaTimesCircle className="shrink-0" />
+    )}
     {active ? 'Activo' : 'Inactivo'}
   </span>
 );
 
 const ChipMoneda = ({ moneda }) => (
-  <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-sky-100 text-sky-700">
-    <FaHashtag /> {moneda || 'ARS'}
+  <span className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded-full border bg-sky-100/70 text-sky-800 border-sky-300 dark:bg-sky-900/30 dark:text-sky-200 dark:border-sky-700">
+    <FaHashtag className="shrink-0" /> {moneda || 'ARS'}
   </span>
 );
 
-const copy = async (text) => {
+const formatCBU = (value) => {
+  if (!value) return '—';
+  const s = String(value).replace(/\D/g, '');
+  // agrupar 22 dígitos: 8-14
+  return s.replace(/(\d{8})(\d{14})/, '$1 $2');
+};
+
+const formatAcct = (n) =>
+  n ? String(n).replace(/(\d{4})(?=\d)/g, '$1 ') : '—';
+
+const copy = async (text, setToast) => {
   try {
     await navigator.clipboard.writeText(text || '');
+    setToast({ open: true, msg: 'Copiado' });
+    setTimeout(() => setToast({ open: false, msg: '' }), 1200);
   } catch {}
 };
+
+const Tooltip = ({ label }) => (
+  <span className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-black/80 px-2 py-1 text-[10px] font-medium text-white opacity-0 group-hover:opacity-100 transition-opacity">
+    {label}
+  </span>
+);
 
 export default function BankAccountCard({
   item,
@@ -41,120 +79,211 @@ export default function BankAccountCard({
   onEdit,
   onToggleActivo,
   onDelete,
-  onView
+  onView,
+  compact = false
 }) {
-  const cbuShown = item.cbu || '—';
-  const aliasShown = item.alias_cbu || '—';
+  const [toast, setToast] = useState({ open: false, msg: '' });
+
+  const cbuShown = useMemo(() => formatCBU(item?.cbu), [item?.cbu]);
+  const aliasShown = item?.alias_cbu || '—';
+  const cuentaShown = useMemo(
+    () => formatAcct(item?.numero_cuenta),
+    [item?.numero_cuenta]
+  );
+
+  // Tilt 3D con framer-motion
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const rotateX = useTransform(y, [-30, 30], [8, -8]);
+  const rotateY = useTransform(x, [-30, 30], [-8, 8]);
+
+  const handleMouseMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const dx = e.clientX - (rect.left + rect.width / 2);
+    const dy = e.clientY - (rect.top + rect.height / 2);
+    x.set(dx);
+    y.set(dy);
+  };
+
+  const buttonBase =
+    'group relative inline-flex items-center justify-center gap-2 px-3 py-2 text-[13px] font-semibold text-white rounded-xl backdrop-blur-md border border-white/20 bg-gradient-to-br shadow-lg transition-all hover:scale-[1.03] hover:brightness-110';
+
+  const buttonVariants = {
+    view: `${buttonBase} from-emerald-500/70 to-emerald-600/90 hover:from-emerald-400 hover:to-emerald-600 focus:ring-emerald-300`,
+    edit: `${buttonBase} from-amber-400/70 to-amber-500/90 hover:from-amber-300 hover:to-amber-600 focus:ring-amber-300`,
+    toggle: `${buttonBase} from-sky-500/70 to-sky-600/90 hover:from-sky-400 hover:to-sky-700 focus:ring-sky-300`,
+    delete: `${buttonBase} from-rose-500/70 to-rose-700/90 hover:from-rose-400 hover:to-rose-700 focus:ring-rose-300`
+  };
 
   return (
     <motion.div
+      style={{ rotateX, rotateY }}
       initial={{ opacity: 0, y: 18, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.25 }}
-      className="bg-white/90 backdrop-blur-xl border border-white/20 rounded-2xl p-5
-             shadow-lg hover:shadow-teal-400/60 hover:scale-[1.02] transition-all duration-300
-             overflow-hidden" // ✅ evita que nada se “salga” visualmente
+      transition={{ duration: 0.35 }}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={() => {
+        x.set(0);
+        y.set(0);
+      }}
+      className="relative group overflow-hidden rounded-3xl border border-white/20 bg-white/80 p-0.5 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.35)] backdrop-blur-xl dark:bg-zinc-900/70 dark:border-white/10"
     >
-      <div className="flex items-start gap-4">
-        <div className="text-3xl text-teal-600 shrink-0">
-          <FaWallet />
+      {/* Borde animado holográfico */}
+      <div className="pointer-events-none absolute inset-0 rounded-3xl">
+        <div className="absolute -inset-[1px] rounded-3xl bg-[conic-gradient(at_20%_-10%,#7dd3fc,transparent_30%,#34d399_50%,transparent_60%,#a78bfa_80%,transparent_100%)] opacity-60 blur-[8px]" />
+      </div>
+
+      {/* Contenido tarjeta */}
+      <div className="relative z-10 rounded-[22px] bg-gradient-to-br from-white/80 to-white/40 p-5 dark:from-zinc-900/70 dark:to-zinc-900/40">
+        {/* Brillo diagonal */}
+        <div className="pointer-events-none absolute -top-16 -left-16 h-44 w-44 rotate-12 rounded-full bg-white/50 blur-2xl dark:bg-white/10" />
+
+        {/* Header */}
+        <div className="flex items-start gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 ring-1 ring-emerald-400/30 dark:text-emerald-300">
+            <FaWallet className="text-xl" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="truncate text-lg font-bold text-zinc-900 dark:text-zinc-50">
+                {item?.nombre_cuenta}
+              </h3>
+              <div className="flex items-center gap-2">
+                <ChipMoneda moneda={item?.moneda} />
+                <Chip active={!!item?.activo} />
+              </div>
+            </div>
+
+            {/* Banco + Alias */}
+            <div
+              className={`mt-2 grid gap-2 text-sm text-zinc-700 dark:text-zinc-300 ${
+                compact ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'
+              }`}
+            >
+              <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
+                <FaUniversity className="text-emerald-600 dark:text-emerald-300" />
+                <span className="truncate" title={bancoNombre || ''}>
+                  {bancoNombre || `Banco #${item?.banco_id}`}
+                </span>
+              </div>
+              <div className="truncate">
+                <span className="font-medium text-zinc-900 dark:text-zinc-100">
+                  Alias:
+                </span>{' '}
+                {aliasShown}
+              </div>
+            </div>
+
+            {/* Numeraciones principales (estilo tarjeta) */}
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-white/20 bg-white/50 p-3 dark:bg-zinc-900/40 dark:border-white/10">
+                <div className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
+                  N° Cuenta
+                </div>
+                <div className="mt-0.5 flex items-center justify-between gap-2">
+                  <div
+                    className="truncate text-base font-semibold text-zinc-900 dark:text-zinc-50"
+                    title={String(item?.numero_cuenta || '')}
+                  >
+                    {cuentaShown}
+                  </div>
+                  {item?.numero_cuenta && (
+                    <button
+                      onClick={() =>
+                        copy(String(item?.numero_cuenta), setToast)
+                      }
+                      className="group relative inline-flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 hover:text-emerald-700 dark:hover:text-emerald-300"
+                    >
+                      <FaCopy />
+                      <Tooltip label="Copiar" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/20 bg-white/50 p-3 dark:bg-zinc-900/40 dark:border-white/10">
+                <div className="text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
+                  CBU
+                </div>
+                <div className="mt-0.5 flex items-center justify-between gap-2">
+                  <div
+                    className="truncate text-base font-semibold text-zinc-900 dark:text-zinc-50"
+                    title={String(item?.cbu || '')}
+                  >
+                    {cbuShown}
+                  </div>
+                  {item?.cbu && (
+                    <button
+                      onClick={() => copy(String(item?.cbu), setToast)}
+                      className="group relative inline-flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 hover:text-emerald-700 dark:hover:text-emerald-300"
+                    >
+                      <FaCopy />
+                      <Tooltip label="Copiar" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Meta info */}
+            <div className="mt-3 text-[11px] text-zinc-500 dark:text-zinc-400">
+              ID: {item?.id} — Creado:{' '}
+              {item?.created_at
+                ? new Date(item.created_at).toLocaleString()
+                : '—'}
+            </div>
+
+            {/* Acciones */}
+            <div className="mt-5 grid grid-cols-[repeat(auto-fit,minmax(44px,1fr))] gap-2">
+              <button
+                onClick={() => onView?.(item)}
+                className={buttonVariants.view}
+              >
+                <FaEye className="text-sm" />
+                <span className="hidden md:inline">Ver</span>
+              </button>
+
+              <button
+                onClick={() => onEdit?.(item)}
+                className={buttonVariants.edit}
+              >
+                <FaEdit className="text-sm" />
+                <span className="hidden md:inline">Editar</span>
+              </button>
+
+              <button
+                onClick={() => onToggleActivo?.(item)}
+                className={buttonVariants.toggle}
+              >
+                <FaEdit className="text-sm" />
+                <span className="hidden md:inline">
+                  {item?.activo ? 'Desact.' : 'Activar'}
+                </span>
+              </button>
+
+              <button
+                onClick={() => onDelete?.(item)}
+                className={buttonVariants.delete}
+              >
+                <FaTrash className="text-sm" />
+                <span className="hidden md:inline">Eliminar</span>
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="font-bold text-lg text-gray-800 truncate">
-              {item.nombre_cuenta}
-            </h3>
-            <div className="flex items-center gap-2">
-              <ChipMoneda moneda={item.moneda} />
-              <ChipActivo active={!!item.activo} />
-            </div>
-          </div>
-
-          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-700">
-            <div className="flex items-center gap-2 text-gray-600">
-              <FaUniversity className="text-teal-600" />
-              <span className="truncate" title={bancoNombre || ''}>
-                {bancoNombre || `Banco #${item.banco_id}`}
-              </span>
-            </div>
-            <div>
-              <span className="font-medium">N° Cuenta:</span>{' '}
-              {item.numero_cuenta || '—'}
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="font-medium">CBU:</span>
-              <span className="truncate">{cbuShown}</span>
-              {item.cbu && (
-                <button
-                  onClick={() => copy(item.cbu)}
-                  className="text-gray-500 hover:text-teal-700"
-                  title="Copiar CBU"
-                >
-                  <FaCopy />
-                </button>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="font-medium">Alias:</span>
-              <span className="truncate">{aliasShown}</span>
-              {item.alias_cbu && (
-                <button
-                  onClick={() => copy(item.alias_cbu)}
-                  className="text-gray-500 hover:text-teal-700"
-                  title="Copiar alias"
-                >
-                  <FaCopy />
-                </button>
-              )}
-            </div>
-            <div className="sm:col-span-2 text-xs text-gray-500">
-              ID: {item.id} — Creado:{' '}
-              {new Date(item.created_at).toLocaleString()}
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-2 grid-cols-[repeat(auto-fit,minmax(140px,1fr))]">
-            <button
-              onClick={() => onView(item)}
-              className="inline-flex w-full items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold
-                 bg-indigo-600 text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
-            >
-              <FaEye className="text-base" />
-              <span className="hidden md:inline">Ver</span>
-            </button>
-
-            <button
-              onClick={() => onEdit(item)}
-              className="inline-flex w-full items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold
-                 bg-yellow-500 text-white hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-            >
-              <FaEdit className="text-base" />
-              <span className="hidden md:inline">Editar</span>
-            </button>
-
-            <button
-              onClick={() => onToggleActivo(item)}
-              className="inline-flex w-full items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold
-                 bg-sky-600 text-white hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-400"
-            >
-              <FaEdit className="text-base" />
-              <span className="hidden md:inline">
-                {item.activo ? 'Desactivar' : 'Activar'}
-              </span>
-            </button>
-
-            <button
-              onClick={() => onDelete(item)}
-              className="inline-flex w-full items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold
-                 bg-rose-600 text-white hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-400"
-            >
-              <FaTrash className="text-base" />
-              <span className="hidden md:inline">Eliminar</span>
-            </button>
-          </div>
+        {/* Gloss diagonal animado */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[22px]">
+          <div className="absolute -left-1/2 top-0 h-full w-full -skew-x-12 bg-gradient-to-r from-white/40 via-white/15 to-transparent opacity-60 blur-md transition-all duration-700 group-hover:translate-x-1/2 group-hover:opacity-80 dark:from-white/10 dark:via-white/5" />
         </div>
       </div>
+
+      {/* Toast simple */}
+      {toast.open && (
+        <div className="pointer-events-none absolute right-3 top-3 z-20 rounded-md bg-zinc-900/90 px-2 py-1 text-xs font-medium text-white shadow-lg">
+          {toast.msg}
+        </div>
+      )}
     </motion.div>
   );
 }

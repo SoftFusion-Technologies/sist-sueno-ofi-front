@@ -122,7 +122,7 @@ const LugaresGet = () => {
       <ParticlesBackground />
       <div className="max-w-5xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <h1 className="text-3xl font-bold text-pink-400 flex items-center gap-2 uppercase">
+          <h1 className="text-3xl font-bold text-orange-400 flex items-center gap-2 uppercase">
             <FaMapMarkerAlt /> Lugares
           </h1>
 
@@ -173,13 +173,13 @@ const LugaresGet = () => {
                   setSearch(e.target.value);
                   setPage(1);
                 }}
-                className="w-full px-4 py-2 rounded-lg border border-gray-600 bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-pink-500"
+                className="w-full px-4 py-2 rounded-lg border border-gray-600 bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
               />
             </div>
 
             <button
               onClick={() => openModal()}
-              className="bg-pink-500 hover:bg-pink-600 px-4 py-2 rounded-lg font-semibold flex items-center justify-center gap-2"
+              className="bg-orange-500 hover:bg-orange-600 px-4 py-2 rounded-lg font-semibold flex items-center justify-center gap-2"
             >
               <FaPlus /> Nuevo Lugar
             </button>
@@ -230,7 +230,7 @@ const LugaresGet = () => {
                           onClick={() => setPage(num)}
                           className={`px-3 py-2 rounded-lg border ${
                             active
-                              ? 'bg-pink-600 border-pink-400'
+                              ? 'bg-orange-600 border-orange-400'
                               : 'bg-gray-800 border-gray-700 hover:bg-gray-700'
                           }`}
                           aria-current={active ? 'page' : undefined}
@@ -287,7 +287,7 @@ const LugaresGet = () => {
                   <h2 className="text-xl font-bold text-white">
                     ID: {lugar.id}
                   </h2>
-                  <h2 className="text-xl font-bold text-pink-300">
+                  <h2 className="text-xl font-bold text-orange-300">
                     {lugar.nombre}
                   </h2>
                   <AdminActions
@@ -338,7 +338,7 @@ const LugaresGet = () => {
                           onClick={() => setPage(num)}
                           className={`px-3 py-2 rounded-lg border ${
                             active
-                              ? 'bg-pink-600 border-pink-400'
+                              ? 'bg-orange-600 border-orange-400'
                               : 'bg-gray-800 border-gray-700 hover:bg-gray-700'
                           }`}
                         >
@@ -375,9 +375,9 @@ const LugaresGet = () => {
           isOpen={modalOpen}
           onRequestClose={() => setModalOpen(false)}
           overlayClassName="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50"
-          className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl border-l-4 border-pink-500"
+          className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl border-l-4 border-orange-500"
         >
-          <h2 className="uppercase text-2xl font-bold mb-4 text-pink-600">
+          <h2 className="uppercase text-2xl font-bold mb-4 text-orange-600">
             {editId ? 'Editar Lugar' : 'Nuevo Lugar'}
           </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -386,13 +386,13 @@ const LugaresGet = () => {
               placeholder="Nombre del lugar"
               value={formNombre}
               onChange={(e) => setFormNombre(e.target.value)}
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-pink-400"
+              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-400"
               required
             />
             <div className="text-right">
               <button
                 type="submit"
-                className="bg-pink-500 hover:bg-pink-600  px-6 py-2 text-white font-medium rounded-lg"
+                className="bg-orange-500 hover:bg-orange-600  px-6 py-2 text-white font-medium rounded-lg"
               >
                 {editId ? 'Actualizar' : 'Guardar'}
               </button>
