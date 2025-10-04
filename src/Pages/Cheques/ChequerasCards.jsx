@@ -1,4 +1,3 @@
-// src/Pages/Cheques/ChequerasCards.jsx
 import React, { useEffect, useMemo, useState } from 'react';
 import NavbarStaff from '../Dash/NavbarStaff';
 import '../../Styles/staff/dashboard.css';
@@ -20,8 +19,16 @@ import {
 import ChequeraCard from '../../Components/Cheques/ChequeraCard';
 import ChequeraFormModal from '../../Components/Cheques/ChequeraFormModal';
 import ChequeraViewModal from '../../Components/Cheques/ChequeraViewModal';
-import ConfirmDialog from '../../Components/Common/ConfirmDialog';
 import ChequeraChequesModal from '../../Components/Cheques/ChequeraChequesModal';
+
+import {
+  showApiErrorSwal,
+  showErrorSwal,
+  showWarnSwal,
+  showSuccessSwal,
+  showConfirmSwal
+} from '../../ui/swal';
+
 const useDebounce = (value, ms = 400) => {
   const [deb, setDeb] = useState(value);
   useEffect(() => {
@@ -40,7 +47,6 @@ export default function ChequerasCards() {
   const [cuentas, setCuentas] = useState([]);
   const [bancoId, setBancoId] = useState('');
   const [cuentaId, setCuentaId] = useState('');
-  const [activo, setActivo] = useState('todos'); // todos/activos/inactivos
   const [estado, setEstado] = useState(''); // activa/agotada/bloqueada/anulada
 
   const [q, setQ] = useState('');
@@ -53,34 +59,36 @@ export default function ChequerasCards() {
   const [viewOpen, setViewOpen] = useState(false);
   const [viewing, setViewing] = useState(null);
 
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [toDelete, setToDelete] = useState(null);
-
   const [openCheques, setOpenCheques] = useState(false);
   const [chequeraSel, setChequeraSel] = useState(null);
 
-  // bancos + todas las cuentas
+  // bancos + cuentas
   useEffect(() => {
     (async () => {
-      const bs = await listBancos({
-        activo: '1',
-        orderBy: 'nombre',
-        orderDir: 'ASC',
-        limit: 1000
-      });
-      setBancos(Array.isArray(bs) ? bs : bs.data || []);
+      try {
+        const bs = await listBancos({
+          activo: '1',
+          orderBy: 'nombre',
+          orderDir: 'ASC',
+          limit: 1000
+        });
+        setBancos(Array.isArray(bs) ? bs : bs.data || []);
 
-      const cs = await listBancoCuentas({
-        activo: '1',
-        orderBy: 'nombre_cuenta',
-        orderDir: 'ASC',
-        limit: 5000
-      });
-      const arrC = Array.isArray(cs) ? cs : cs.data || [];
-      setCuentas(arrC);
-      if (!cuentaId && arrC[0]) setCuentaId(String(arrC[-1].id));
-    })().catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        const cs = await listBancoCuentas({
+          activo: '1',
+          orderBy: 'nombre_cuenta',
+          orderDir: 'ASC',
+          limit: 5000
+        });
+        const arrC = Array.isArray(cs) ? cs : cs.data || [];
+        setCuentas(arrC);
+      } catch (e) {
+        await showErrorSwal({
+          title: 'Error',
+          text: 'No se pudieron cargar bancos/cuentas.'
+        });
+      }
+    })();
   }, []);
 
   const fetchData = async () => {
@@ -99,7 +107,7 @@ export default function ChequerasCards() {
 
       const data = await listChequeras(params);
       if (Array.isArray(data)) {
-        setRows(data.filter(Boolean)); // 🔒 filtra null/undefined
+        setRows(data.filter(Boolean));
         setMeta(null);
       } else {
         const arr = (data.data || []).filter(Boolean);
@@ -107,16 +115,18 @@ export default function ChequerasCards() {
         setMeta(data.meta || null);
       }
     } catch (e) {
-      console.error(e);
-      alert('Error cargando chequeras');
+      await showApiErrorSwal(e, {
+        fallbackTitle: 'Error al listar',
+        fallbackText: 'No se pudo cargar chequeras.'
+      });
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData(); /* eslint-disable-next-line */
-  }, [dq, bancoId, cuentaId, estado, activo, page]);
+    fetchData(); // eslint-disable-next-line
+  }, [dq, bancoId, cuentaId, estado, page]);
 
   const nombreBanco = (id) =>
     bancos.find((b) => Number(b.id) === Number(id))?.nombre || `Banco #${id}`;
@@ -132,38 +142,121 @@ export default function ChequerasCards() {
     setEditing(item);
     setModalOpen(true);
   };
-  const onSubmit = async (payload) => {
-    if (editing?.id) await updateChequera(editing.id, payload);
-    else await createChequera(payload);
-    await fetchData();
-  };
 
-  const onToggleActivo = async (item) => {
+  // Crear / Editar con manejo de 409 RANGO_SUPERPUESTO (con sugerencia)
+  const onSubmit = async (payload) => {
     try {
-      await updateChequera(item.id, { activo: !item.activo });
-      setRows((r) =>
-        r.map((x) => (x.id === item.id ? { ...x, activo: !x.activo } : x))
-      );
+      if (editing?.id) {
+        await updateChequera(editing.id, payload);
+        await showSuccessSwal({
+          title: 'Actualizada',
+          text: 'Chequera actualizada correctamente.'
+        });
+      } else {
+        await createChequera(payload);
+        await showSuccessSwal({
+          title: 'Creada',
+          text: 'Chequera creada correctamente.'
+        });
+      }
+      setModalOpen(false);
+      setEditing(null);
+      await fetchData();
     } catch (e) {
-      console.error(e);
-      alert('No se pudo actualizar el estado');
+      if (e?.code === 'RANGO_SUPERPUESTO' && e?.details?.suggestion) {
+        const s = e.details.suggestion;
+        const ok = await showConfirmSwal({
+          title: 'Rango superpuesto',
+          text:
+            (e.mensajeError || 'El rango se superpone.') +
+            `<br/>Sugerido: <b>${s.nro_desde} – ${s.nro_hasta}</b><br/>¿Aplicar sugerencia automáticamente?`,
+          confirmText: 'Aplicar sugerencia',
+          cancelText: 'Cancelar',
+          icon: 'warning'
+        });
+        if (!ok) return;
+
+        // Reintenta creándola con la sugerencia (auto=true)
+        try {
+          await createChequera({
+            ...payload,
+            nro_desde: s.nro_desde,
+            nro_hasta: s.nro_hasta,
+            proximo_nro: s.proximo_nro ?? s.nro_desde,
+            auto: true
+          });
+          await showSuccessSwal({
+            title: 'Creada',
+            text: 'Chequera creada con rango sugerido.'
+          });
+          setModalOpen(false);
+          setEditing(null);
+          await fetchData();
+        } catch (e2) {
+          await showApiErrorSwal(e2, {
+            fallbackTitle: 'Error',
+            fallbackText: 'No se pudo crear con la sugerencia.'
+          });
+        }
+        return;
+      }
+
+      // Otros errores normalizados
+      await showApiErrorSwal(e, {
+        fallbackTitle: 'Error',
+        fallbackText: 'No se pudo guardar la chequera.'
+      });
     }
   };
 
-  const onAskDelete = (item) => {
-    setToDelete(item);
-    setConfirmOpen(true);
-  };
-  const onConfirmDelete = async () => {
+  // Eliminar / Anular con confirm y forzar si hay cheques
+  const onAskDelete = async (item) => {
+    const ok = await showConfirmSwal({
+      title: 'Eliminar chequera',
+      text: `¿Seguro que desea eliminar la chequera #${item.id} (${item.nro_desde} – ${item.nro_hasta})?`
+    });
+    if (!ok) return;
+
     try {
-      await deleteChequera(toDelete.id);
-      setRows((r) => r.filter((x) => x.id !== toDelete.id));
+      await deleteChequera(item.id); // intento eliminación dura
+      setRows((r) => r.filter((x) => x.id !== item.id));
+      await showSuccessSwal({
+        title: 'Eliminada',
+        text: 'Chequera eliminada correctamente.'
+      });
     } catch (e) {
-      console.error(e);
-      alert('No se pudo eliminar (verifique dependencias)');
-    } finally {
-      setConfirmOpen(false);
-      setToDelete(null);
+      if (e?.code === 'HAS_CHEQUES') {
+        const okForzar = await showConfirmSwal({
+          title: 'No se puede eliminar',
+          text:
+            (e.mensajeError || 'Hay cheques asociados.') +
+            '<br/>¿Desea <b>ANULARLA</b> de todas formas?',
+          confirmText: 'Anular',
+          cancelText: 'Cancelar',
+          icon: 'warning'
+        });
+        if (!okForzar) return;
+
+        try {
+          await deleteChequera(item.id, { forzar: 1 }); // anular
+          // no la removemos de la grilla si el backend la mantiene; forzamos refresh
+          await fetchData();
+          await showSuccessSwal({
+            title: 'Anulada',
+            text: 'Chequera anulada correctamente.'
+          });
+        } catch (e2) {
+          await showApiErrorSwal(e2, {
+            fallbackTitle: 'Error',
+            fallbackText: 'No se pudo anular la chequera.'
+          });
+        }
+      } else {
+        await showApiErrorSwal(e, {
+          fallbackTitle: 'Error',
+          fallbackText: 'No se pudo eliminar la chequera.'
+        });
+      }
     }
   };
 
@@ -171,7 +264,7 @@ export default function ChequerasCards() {
     setPage(1);
     setCuentaId(val);
     const c = cuentas.find((x) => String(x.id) === String(val));
-    if (c) setBancoId(String(c.banco_id)); // sincroniza banco con cuenta
+    if (c) setBancoId(String(c.banco_id));
   };
 
   const getBancoIdFromRow = (row) => {
@@ -288,25 +381,12 @@ export default function ChequerasCards() {
               >
                 <option value="">Estado (todos)</option>
                 <option value="activa">activa</option>
-                <option value="cerrada">cerrada</option>
+                <option value="agotada">agotada</option>
                 <option value="bloqueada">bloqueada</option>
                 <option value="anulada">anulada</option>
               </select>
 
-              <select
-                value={activo}
-                onChange={(e) => {
-                  setPage(1);
-                  setActivo(e.target.value);
-                }}
-                className="px-3 py-2 rounded-xl border border-white/20 bg-white/90 focus:outline-none focus:ring-2 focus:ring-emerald-500 lg:col-span-1"
-              >
-                <option value="todos">Todos</option>
-                <option value="activos">Activos</option>
-                <option value="inactivos">Inactivos</option>
-              </select>
-
-              <div className="flex items-center gap-2 lg:col-span-1">
+              <div className="flex items-center gap-2 lg:col-span-2">
                 <button
                   onClick={onNew}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 w-full"
@@ -330,11 +410,11 @@ export default function ChequerasCards() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                 {rows.map((it, idx) => {
-                  if (!it) return null; // 🔒
+                  if (!it) return null;
                   const bid = getBancoIdFromRow(it);
                   return (
                     <ChequeraCard
-                      key={it.id ?? `row-${idx}`} // 🔒 key segura
+                      key={it.id ?? `row-${idx}`}
                       item={it}
                       bancoNombre={nombreBanco(bid)}
                       cuentaNombre={nombreCuenta(it.banco_cuenta_id)}
@@ -342,15 +422,12 @@ export default function ChequerasCards() {
                         setViewing(row);
                         setViewOpen(true);
                       }}
-                      onViewCheques={handleViewCheques}
+                      onViewCheques={() => handleViewCheques(it)}
                       onEdit={(row) => {
                         setEditing(row);
                         setModalOpen(true);
                       }}
-                      onDelete={(row) => {
-                        setToDelete(row);
-                        setConfirmOpen(true);
-                      }}
+                      onDelete={(row) => onAskDelete(row)}
                     />
                   );
                 })}
@@ -368,6 +445,7 @@ export default function ChequerasCards() {
         onSubmit={onSubmit}
         initial={editing}
       />
+
       <ChequeraViewModal
         open={viewOpen}
         onClose={() => setViewOpen(false)}
@@ -379,17 +457,7 @@ export default function ChequerasCards() {
         }
         cuentaNombre={viewing ? nombreCuenta(viewing.banco_cuenta_id) : ''}
       />
-      <ConfirmDialog
-        open={confirmOpen}
-        title="Eliminar chequera"
-        message={
-          toDelete
-            ? `¿Seguro que desea eliminar la chequera #${toDelete.id} (${toDelete.nro_desde}–${toDelete.nro_hasta})?`
-            : ''
-        }
-        onCancel={() => setConfirmOpen(false)}
-        onConfirm={onConfirmDelete}
-      />
+
       <ChequeraChequesModal
         open={openCheques}
         onClose={() => setOpenCheques(false)}

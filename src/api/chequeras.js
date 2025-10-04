@@ -30,7 +30,8 @@ export const updateChequera = async (id, payload) => {
   return data;
 };
 
-export const deleteChequera = async (id) => {
-  const { data } = await client.delete(`/chequeras/${id}`);
+// ⚠️ aceptar params (p.ej. { forzar:1 })
+export const deleteChequera = async (id, params = {}) => {
+  const { data } = await client.delete(`/chequeras/${id}`, { params });
   return data;
 };
