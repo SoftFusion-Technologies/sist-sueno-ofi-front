@@ -1,4 +1,3 @@
-// src/Components/Cheques/ChequeCard.jsx
 import React from 'react';
 import { motion } from 'framer-motion';
 import {
@@ -12,100 +11,55 @@ import {
   FaHandHolding, // Entregar
   FaExchangeAlt, // Compensar
   FaBan, // Anular
-  FaMoneyCheckAlt, // Icono principal
-  FaUniversity, // Banco
-  FaBook, // Chequera
-  FaMoneyBill, // movimientows
-  FaImages // imagenes
+  FaMoneyCheckAlt,
+  FaUniversity,
+  FaBook,
+  FaMoneyBill,
+  FaImages
 } from 'react-icons/fa';
 
-// Config visual por acción
-const BTN_CONFIG = {
-  depositar: {
-    label: 'Depositar',
-    icon: <FaArrowDown />,
-    classes: 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-300'
-  },
-  acreditar: {
-    label: 'Acreditar',
-    icon: <FaCheckCircle />,
-    classes: 'bg-teal-600 hover:bg-teal-700 focus:ring-teal-300'
-  },
-  rechazar: {
-    label: 'Rechazar',
-    icon: <FaTimesCircle />,
-    classes: 'bg-rose-600 hover:bg-rose-700 focus:ring-rose-300'
-  },
-  'aplicar-a-proveedor': {
-    label: 'Aplicar a Proveedor',
-    icon: <FaUserTie />,
-    classes: 'bg-amber-600 hover:bg-amber-700 focus:ring-amber-300'
-  },
-  entregar: {
-    label: 'Entregar',
-    icon: <FaHandHolding />,
-    classes: 'bg-fuchsia-600 hover:bg-fuchsia-700 focus:ring-fuchsia-300'
-  },
-  compensar: {
-    label: 'Compensar',
-    icon: <FaExchangeAlt />,
-    classes: 'bg-cyan-600 hover:bg-cyan-700 focus:ring-cyan-300'
-  },
-  anular: {
-    label: 'Anular',
-    icon: <FaBan />,
-    classes: 'bg-red-600 hover:bg-red-700 focus:ring-red-300'
-  }
-};
-
-// Mini botón reutilizable
-function ActionBtn({ label, icon, onClick, classes }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`shrink-0 inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold text-white focus:outline-none focus:ring-2 ${classes}`}
-      aria-label={label}
-      title={label}
-      type="button"
-    >
-      {icon}
-      <span className="hidden sm:inline">{label}</span>
-    </button>
-  );
-}
-
-const Chip = ({ text, cls }) => (
-  <span
-    className={`inline-flex items-center text-xs px-2 py-1 rounded-full ${cls}`}
-  >
-    {text}
-  </span>
-);
-
-
-const chipTipo = (t = 'recibido') =>
-  t === 'emitido' ? 'bg-amber-100 text-amber-700' : 'bg-sky-100 text-sky-700';
-
-const chipEstado = (e = 'registrado') =>
-  ({
-    registrado: 'bg-gray-100 text-gray-700',
-    en_cartera: 'bg-indigo-100 text-indigo-700',
-    aplicado_a_compra: 'bg-amber-100 text-amber-700',
-    endosado: 'bg-cyan-100 text-cyan-700',
-    depositado: 'bg-blue-100 text-blue-700',
-    acreditado: 'bg-emerald-100 text-emerald-700',
-    rechazado: 'bg-rose-100 text-rose-700',
-    anulado: 'bg-zinc-200 text-zinc-700',
-    entregado: 'bg-fuchsia-100 text-fuchsia-700',
-    compensado: 'bg-teal-100 text-teal-700'
-  }[e] || 'bg-gray-100 text-gray-700');
+/**
+ * ChequeCard — LemonTeal v1
+ * --------------------------------------------------------------
+ * Estilo fintech tipo Lemon Cash, pero en **teal**:
+ *  - Card limpia, bordes 20px, sombra suave y gradiente teal sutil.
+ *  - Monto grande arriba, chips redondeados simples.
+ *  - Acciones "teal-first": botones cápsula sólidos/ghost consistentes.
+ *  - Tipografía fuerte, layout de 2 columnas claro.
+ * Mantiene la misma API.
+ */
 
 const fmt = (n) =>
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(
     Number(n || 0)
   );
 
-// ───────────────────────────────── helper: qué acciones mostrar
+const chipTipo = (t = 'recibido') =>
+  t === 'emitido' ? 'bg-amber-100 text-amber-700' : 'bg-teal-100 text-teal-700';
+
+const chipEstado = (e = 'registrado') =>
+  ({
+    registrado: 'bg-zinc-100 text-zinc-700',
+    en_cartera: 'bg-indigo-100 text-indigo-700',
+    aplicado_a_compra: 'bg-amber-100 text-amber-700',
+    endosado: 'bg-cyan-100 text-cyan-700',
+    depositado: 'bg-sky-100 text-sky-700',
+    acreditado: 'bg-emerald-100 text-emerald-700',
+    rechazado: 'bg-rose-100 text-rose-700',
+    anulado: 'bg-zinc-200 text-zinc-700',
+    entregado: 'bg-fuchsia-100 text-fuchsia-700',
+    compensado: 'bg-teal-100 text-teal-700'
+  }[e] || 'bg-zinc-100 text-zinc-700');
+
+const Pill = ({ children, className = '' }) => (
+  <span
+    className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${className}`}
+  >
+    {children}
+  </span>
+);
+
+// Acciones permitidas (misma lógica)
 function getAllowedActions(ch) {
   const { tipo, estado } = ch || {};
   if (tipo === 'recibido') {
@@ -117,7 +71,7 @@ function getAllowedActions(ch) {
   }
   if (tipo === 'emitido') {
     if (['registrado', 'en_cartera'].includes(estado))
-      return ['entregar', 'anular']; // sin aplicar-a-proveedor si backend no soporta
+      return ['entregar', 'anular'];
     if (['aplicado_a_compra', 'entregado'].includes(estado))
       return ['compensar', 'anular'];
     return [];
@@ -125,17 +79,58 @@ function getAllowedActions(ch) {
   return [];
 }
 
-// ───────────────────────────────── componente
+const BtnSolid = ({ onClick, icon, label, tone = 'teal' }) => {
+  const tones = {
+    teal: 'from-teal-500 to-teal-600 focus:ring-teal-300',
+    amber: 'from-amber-400 to-amber-500 focus:ring-amber-300',
+    rose: 'from-rose-500 to-rose-600 focus:ring-rose-300',
+    blue: 'from-sky-500 to-sky-600 focus:ring-sky-300',
+    green: 'from-emerald-500 to-emerald-600 focus:ring-emerald-300',
+    fuchsia: 'from-fuchsia-500 to-fuchsia-600 focus:ring-fuchsia-300',
+    zinc: 'from-zinc-600 to-zinc-700 focus:ring-zinc-300'
+  };
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-semibold text-white shadow-sm focus:outline-none focus:ring-2 border border-white/10 bg-gradient-to-br ${tones[tone]}`}
+    >
+      <span className="text-[13px]">{icon}</span>
+      <span className="hidden sm:inline">{label}</span>
+    </button>
+  );
+};
+
+const BtnGhost = ({ onClick, icon, label, tone = 'teal' }) => {
+  const rings = {
+    teal: 'ring-teal-300/50 text-teal-700 hover:bg-teal-50',
+    amber: 'ring-amber-300/50 text-amber-700 hover:bg-amber-50',
+    rose: 'ring-rose-300/50 text-rose-700 hover:bg-rose-50',
+    sky: 'ring-sky-300/50 text-sky-700 hover:bg-sky-50',
+    zinc: 'ring-zinc-300/60 text-zinc-700 hover:bg-zinc-50'
+  };
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-semibold ring-1 ${rings[tone]} transition-colors`}
+    >
+      <span className="text-[13px]">{icon}</span>
+      <span className="hidden sm:inline">{label}</span>
+    </button>
+  );
+};
+
 export default function ChequeCard({
   item,
-  bancoNombre, // string ya resuelto
-  chequeraDesc, // string ya resuelto
+  bancoNombre,
+  chequeraDesc,
   onView,
   onEdit,
   onDelete,
-  onMovimientos, //movimientos
-  onImagenes, // imagenes
-  onActions // { depositar, acreditar, rechazar, aplicarProveedor, entregar, compensar, anular }
+  onMovimientos,
+  onImagenes,
+  onActions
 }) {
   if (!item) return null;
 
@@ -151,15 +146,12 @@ export default function ChequeCard({
     fecha_cobro_prevista
   } = item;
 
-  // Acciones permitidas por estado/tipo
   const allowed = getAllowedActions(item);
-
-  // Mapeo clave->handler
   const handlers = {
     depositar: onActions?.depositar,
     acreditar: onActions?.acreditar,
     rechazar: onActions?.rechazar,
-    'aplicar-a-proveedor': onActions?.aplicarProveedor, // ojo con el nombre
+    'aplicar-a-proveedor': onActions?.aplicarProveedor,
     entregar: onActions?.entregar,
     compensar: onActions?.compensar,
     anular: onActions?.anular
@@ -167,130 +159,167 @@ export default function ChequeCard({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 18, scale: 0.98 }}
+      initial={{ opacity: 0, y: 16, scale: 0.985 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.25 }}
-      className="bg-white/90 backdrop-blur-xl border border-white/20 rounded-2xl p-5 shadow-lg hover:shadow-emerald-400/60 hover:scale-[1.02] transition-all duration-300"
+      className="relative overflow-hidden rounded-3xl border border-teal-200/50 bg-white shadow-[0_12px_40px_-16px_rgba(13,148,136,0.35)]"
     >
-      <div className="flex items-start gap-4">
-        <div className="text-3xl text-emerald-600 shrink-0">
-          <FaMoneyCheckAlt />
+      {/* header gradiente sutil */}
+      <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-teal-50 to-transparent" />
+
+      <div className="relative z-10 p-5 sm:p-6">
+        {/* top: monto + chips */}
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-widest text-teal-600">
+              Cheque #{numero}
+            </div>
+            <div className="mt-1 text-2xl sm:text-3xl font-black text-zinc-900">
+              {fmt(monto)}
+            </div>
+            <div className="mt-1 text-sm text-zinc-500">#{numero}</div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Pill className={chipTipo(tipo)}>{tipo}</Pill>
+            <Pill className={chipEstado(estado)}>
+              {String(estado).replaceAll('_', ' ')}
+            </Pill>
+          </div>
         </div>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="font-bold text-lg text-gray-800 truncate">
-              Cheque #{numero} — {fmt(monto)}
-            </h3>
-            <div className="flex items-center gap-2">
-              <Chip text={tipo} cls={chipTipo(tipo)} />
-              <Chip text={estado} cls={chipEstado(estado)} />
+        {/* info principal */}
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-zinc-200/60 p-3">
+            <div className="text-[10px] uppercase tracking-widest text-zinc-500">
+              Banco
+            </div>
+            <div className="mt-0.5 flex items-center gap-2 text-sm text-zinc-800">
+              <FaUniversity className="text-teal-600" /> {bancoNombre || '—'}
             </div>
           </div>
-
-          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-700">
-            <div className="flex items-center gap-2 text-gray-600">
-              <FaUniversity className="text-emerald-600" />
-              <span className="truncate" title={bancoNombre}>
-                {bancoNombre || '—'}
-              </span>
+          <div className="rounded-2xl border border-zinc-200/60 p-3">
+            <div className="text-[10px] uppercase tracking-widest text-zinc-500">
+              Chequera
             </div>
-            <div className="flex items-center gap-2 text-gray-600">
-              <FaBook className="text-emerald-600" />
-              <span className="truncate" title={chequeraDesc}>
-                {chequeraDesc || '—'}
-              </span>
-            </div>
-
-            <div>
-              <span className="font-medium">Canal:</span> {canal || 'C1'}
-            </div>
-            <div>
-              <span className="font-medium">Emisión:</span>{' '}
-              {fecha_emision
-                ? new Date(fecha_emision).toLocaleDateString()
-                : '—'}
-            </div>
-            <div>
-              <span className="font-medium">Vencimiento:</span>{' '}
-              {fecha_vencimiento
-                ? new Date(fecha_vencimiento).toLocaleDateString()
-                : '—'}
-            </div>
-            <div>
-              <span className="font-medium">Cobro previsto:</span>{' '}
-              {fecha_cobro_prevista
-                ? new Date(fecha_cobro_prevista).toLocaleDateString()
-                : '—'}
-            </div>
-
-            <div className="sm:col-span-2 text-xs text-gray-500">
-              ID: {id}
-              {item.created_at && (
-                <> — Creado: {new Date(item.created_at).toLocaleString()}</>
-              )}
+            <div className="mt-0.5 flex items-center gap-2 text-sm text-zinc-800">
+              <FaBook className="text-teal-600" /> {chequeraDesc || '—'}
             </div>
           </div>
-
-          {/* Acciones */}
-          <div className="mt-4 -mx-1 overflow-x-auto">
-            <div className="flex items-center gap-2 px-1">
-              {/* Abrir / Editar */}
-              <ActionBtn
-                label="Abrir"
-                icon={<FaRegFolderOpen />}
-                onClick={() => onView?.(item)}
-                classes="bg-green-600 text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-400"
-              />
-              <ActionBtn
-                label="Editar"
-                icon={<FaEdit />}
-                onClick={() => onEdit?.(item)}
-                classes="bg-yellow-500 hover:bg-yellow-700 focus:ring-yellow-300"
-              />
-
-              <ActionBtn
-                label="Imágenes"
-                icon={<FaImages />}
-                onClick={() => onImagenes?.(item)} // callback hacia el padre
-                classes="bg-purple-600 hover:bg-purple-700 focus:ring-purple-300"
-              />
-
-              {/* 🔹 Nuevo botón Movimientos */}
-              <ActionBtn
-                label="Movimientos"
-                icon={<FaMoneyBill />} // o FaExchangeAlt si prefieres
-                onClick={() => onMovimientos?.(item)}
-                classes="bg-teal-600 hover:bg-teal-700 focus:ring-teal-300"
-              />
-              {/* Transiciones válidas (si hay handler definido) */}
-              {allowed.map((key) => {
-                const cfg = BTN_CONFIG[key];
-                const fn = handlers[key];
-                if (!cfg || !fn) return null;
-                return (
-                  <ActionBtn
-                    key={key}
-                    label={cfg.label}
-                    icon={cfg.icon}
-                    onClick={() => fn(item)}
-                    classes={cfg.classes}
-                  />
-                );
-              })}
-
-              {/* Eliminar a la derecha */}
-              <div className="ml-auto" />
-              <ActionBtn
-                label="Eliminar"
-                icon={<FaTrash />}
-                onClick={() => onDelete?.(item)}
-                classes="bg-red-600 hover:bg-red-700 focus:ring-red-300"
-              />
+          <div className="rounded-2xl border border-zinc-200/60 p-3">
+            <div className="text-[10px] uppercase tracking-widest text-zinc-500">
+              Canal
             </div>
+            <div className="mt-0.5 text-sm text-zinc-800">{canal || 'C1'}</div>
+          </div>
+        </div>
+
+        {/* fechas */}
+        <div className="mt-3 grid gap-2 sm:grid-cols-3 text-sm text-zinc-700">
+          <div>
+            <span className="font-medium">Emisión:</span>{' '}
+            {fecha_emision ? new Date(fecha_emision).toLocaleDateString() : '—'}
+          </div>
+          <div>
+            <span className="font-medium">Vencimiento:</span>{' '}
+            {fecha_vencimiento
+              ? new Date(fecha_vencimiento).toLocaleDateString()
+              : '—'}
+          </div>
+          <div>
+            <span className="font-medium">Cobro previsto:</span>{' '}
+            {fecha_cobro_prevista
+              ? new Date(fecha_cobro_prevista).toLocaleDateString()
+              : '—'}
+          </div>
+          <div className="sm:col-span-3 text-[11px] text-zinc-500">
+            ID: {id}
+            {item.created_at
+              ? ` — Creado: ${new Date(item.created_at).toLocaleString()}`
+              : ''}
+          </div>
+        </div>
+
+        {/* acciones */}
+        <div className="mt-5 -mx-1 overflow-x-auto">
+          <div className="flex items-center gap-2 px-1">
+            <BtnSolid
+              onClick={() => onView?.(item)}
+              icon={<FaRegFolderOpen />}
+              label="Abrir"
+              tone="teal"
+            />
+            <BtnGhost
+              onClick={() => onEdit?.(item)}
+              icon={<FaEdit />}
+              label="Editar"
+              tone="amber"
+            />
+            <BtnGhost
+              onClick={() => onImagenes?.(item)}
+              icon={<FaImages />}
+              label="Imágenes"
+              tone="teal"
+            />
+            <BtnGhost
+              onClick={() => onMovimientos?.(item)}
+              icon={<FaMoneyBill />}
+              label="Movimientos"
+              tone="teal"
+            />
+
+            {allowed.map((k) => {
+              const mapTone = {
+                depositar: 'teal',
+                acreditar: 'green',
+                rechazar: 'rose',
+                'aplicar-a-proveedor': 'amber',
+                entregar: 'teal',
+                compensar: 'teal',
+                anular: 'rose'
+              };
+              const tone = mapTone[k] || 'zinc';
+              const iconMap = {
+                depositar: <FaArrowDown />,
+                acreditar: <FaCheckCircle />,
+                rechazar: <FaTimesCircle />,
+                'aplicar-a-proveedor': <FaUserTie />,
+                entregar: <FaHandHolding />,
+                compensar: <FaExchangeAlt />,
+                anular: <FaBan />
+              };
+              const labelMap = {
+                depositar: 'Depositar',
+                acreditar: 'Acreditar',
+                rechazar: 'Rechazar',
+                'aplicar-a-proveedor': 'Aplicar a Proveedor',
+                entregar: 'Entregar',
+                compensar: 'Compensar',
+                anular: 'Anular'
+              };
+              return (
+                <BtnGhost
+                  key={k}
+                  onClick={() => handlers[k]?.(item)}
+                  icon={iconMap[k]}
+                  label={labelMap[k]}
+                  tone={tone}
+                />
+              );
+            })}
+
+            <div className="ml-auto" />
+            <BtnGhost
+              onClick={() => onDelete?.(item)}
+              icon={<FaTrash />}
+              label="Eliminar"
+              tone="zinc"
+            />
           </div>
         </div>
       </div>
+
+      {/* footer teal soft */}
+      <div className="h-3 w-full bg-gradient-to-r from-teal-100 via-transparent to-teal-100" />
     </motion.div>
   );
 }
