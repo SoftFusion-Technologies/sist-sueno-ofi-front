@@ -115,6 +115,23 @@ export default function BankAccountCard({
     delete: `${buttonBase} from-rose-500/70 to-rose-700/90 hover:from-rose-400 hover:to-rose-700 focus:ring-rose-300`
   };
 
+    const inactive = !item?.activo; // 👈 flag
+
+    // variantes “apagadas” para acciones
+    const buttonDisabledBase =
+      'inline-flex w-full items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold border border-white/10 bg-white/20 text-zinc-400 shadow-none pointer-events-none';
+    const buttonVariantsInactive = {
+      view: buttonDisabledBase,
+      edit: buttonDisabledBase,
+      delete: buttonDisabledBase,
+      // 👈 mantener Activar en teal aunque esté inactiva
+      toggle:
+        'inline-flex w-full items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold bg-teal-600 text-white hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-400'
+    };
+
+    const bv = inactive ? buttonVariantsInactive : buttonVariants;
+
+
   return (
     <motion.div
       style={{ rotateX, rotateY }}
@@ -126,26 +143,66 @@ export default function BankAccountCard({
         x.set(0);
         y.set(0);
       }}
-      className="relative group overflow-hidden rounded-3xl border border-white/20 bg-white/80 p-0.5 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.35)] backdrop-blur-xl dark:bg-zinc-900/70 dark:border-white/10"
+      // 👇 activa: hover teal y escala; inactiva: tenue y sin glow
+      className={[
+        'relative group overflow-hidden rounded-3xl border p-0.5 backdrop-blur-xl',
+        'shadow-[0_8px_40px_-12px_rgba(0,0,0,0.35)]',
+        'border-white/20 dark:border-white/10',
+        inactive
+          ? 'bg-white/60 dark:bg-zinc-900/60 saturate-75 contrast-90 opacity-85 grayscale-[15%] hover:scale-[1.005]'
+          : 'bg-white/80 dark:bg-zinc-900/70 hover:scale-[1.02] hover:shadow-teal-400/60 transition-all duration-300'
+      ].join(' ')}
     >
-      {/* Borde animado holográfico */}
+      {/* Borde holográfico — más tenue si está inactiva */}
       <div className="pointer-events-none absolute inset-0 rounded-3xl">
-        <div className="absolute -inset-[1px] rounded-3xl bg-[conic-gradient(at_20%_-10%,#7dd3fc,transparent_30%,#34d399_50%,transparent_60%,#a78bfa_80%,transparent_100%)] opacity-60 blur-[8px]" />
+        <div
+          className={[
+            'absolute -inset-[1px] rounded-3xl blur-[8px]',
+            'bg-[conic-gradient(at_20%_-10%,#7dd3fc,transparent_30%,#34d399_50%,transparent_60%,#a78bfa_80%,transparent_100%)]',
+            inactive ? 'opacity-20' : 'opacity-60'
+          ].join(' ')}
+        />
       </div>
-
       {/* Contenido tarjeta */}
-      <div className="relative z-10 rounded-[22px] bg-gradient-to-br from-white/80 to-white/40 p-5 dark:from-zinc-900/70 dark:to-zinc-900/40">
+      <div
+        className={[
+          'relative z-10 rounded-[22px] p-5',
+          inactive
+            ? 'bg-gradient-to-br from-white/70 to-white/30 dark:from-zinc-900/60 dark:to-zinc-900/30'
+            : 'bg-gradient-to-br from-white/80 to-white/40 dark:from-zinc-900/70 dark:to-zinc-900/40'
+        ].join(' ')}
+      >
         {/* Brillo diagonal */}
-        <div className="pointer-events-none absolute -top-16 -left-16 h-44 w-44 rotate-12 rounded-full bg-white/50 blur-2xl dark:bg-white/10" />
-
+        <div
+          className={[
+            'pointer-events-none absolute -top-16 -left-16 h-44 w-44 rotate-12 rounded-full blur-2xl',
+            inactive
+              ? 'bg-white/30 dark:bg-white/5'
+              : 'bg-white/50 dark:bg-white/10'
+          ].join(' ')}
+        />
         {/* Header */}
         <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 ring-1 ring-emerald-400/30 dark:text-emerald-300">
+          <div
+            className={[
+              'flex h-12 w-12 items-center justify-center rounded-2xl ring-1',
+              inactive
+                ? 'bg-zinc-500/10 text-zinc-500 ring-zinc-400/20'
+                : 'bg-emerald-500/10 text-emerald-600 ring-emerald-400/30 dark:text-emerald-300'
+            ].join(' ')}
+          >
             <FaWallet className="text-xl" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h3 className="truncate text-lg font-bold text-zinc-900 dark:text-zinc-50">
+              <h3
+                className={[
+                  'truncate text-lg font-bold',
+                  inactive
+                    ? 'text-zinc-600 dark:text-zinc-400'
+                    : 'text-zinc-900 dark:text-zinc-50'
+                ].join(' ')}
+              >
                 {item?.nombre_cuenta}
               </h3>
               <div className="flex items-center gap-2">
@@ -153,7 +210,6 @@ export default function BankAccountCard({
                 <Chip active={!!item?.activo} />
               </div>
             </div>
-
             {/* Banco + Alias */}
             <div
               className={`mt-2 grid gap-2 text-sm text-zinc-700 dark:text-zinc-300 ${
