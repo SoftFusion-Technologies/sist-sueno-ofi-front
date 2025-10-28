@@ -18,7 +18,8 @@ import {
   FaPercentage,
   FaCog,
   FaCashRegister,
-  FaTruckMoving
+  FaTruckMoving,
+  FaRegSmileBeam
 } from 'react-icons/fa';
 import { LiaCashRegisterSolid } from 'react-icons/lia';
 
@@ -48,7 +49,12 @@ const ventasLinks = [
     icon: <LiaCashRegisterSolid />,
     desc: 'Movimientos de caja'
   },
-
+  {
+    to: '/dashboard/ventas/resumen',
+    label: 'Resumenes de Caja',
+    icon: <FaRegSmileBeam />,
+    desc: 'Movimientos de caja'
+  },
   {
     to: '/dashboard/ventas/historial',
     label: 'Historial de Ventas',

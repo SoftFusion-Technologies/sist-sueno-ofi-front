@@ -78,6 +78,7 @@ import ChequeMovimientosTablePlus from './Pages/Cheques/ChequeMovimientosTablePl
 import ChequeImagesManager from './Components/Cheques/ChequeImagesManager';
 import AdminPageTesoreria from './Pages/Tesoreria/AdminPageTesoreria';
 import TesoFlujoPage from './Pages/Tesoreria/TesoFlujoPage';
+import AdminPageCaja from './Pages/Ventas/AdminPageCaja';
 
 function AppContent() {
   const { hideLayoutFooter, hideLayoutNav } = useLayoutVisibility();
@@ -405,6 +406,15 @@ function AppContent() {
               <ProtectedRoute>
                 {' '}
                 <DashboardEstadisticasVendedores />{' '}
+              </ProtectedRoute>
+            }
+          />
+          <Ruta
+            path="/dashboard/ventas/resumen"
+            element={
+              <ProtectedRoute>
+                {' '}
+                <AdminPageCaja />{' '}
               </ProtectedRoute>
             }
           />
