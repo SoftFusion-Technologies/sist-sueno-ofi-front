@@ -52,6 +52,7 @@ const ESTADOS = [
   'entregado',
   'compensado'
 ];
+const FORMATOS = ['fisico', 'echeq']; // nuevo campo para administrar si el tipo de cheque es fisico o electronico
 
 export const fmtVenta = (v, clientesIdx) => {
   if (!v) return '';
@@ -135,6 +136,7 @@ export default function ChequeFormModal({ open, onClose, onSubmit, initial }) {
   const [form, setForm] = useState({
     tipo: 'recibido',
     canal: 'C1',
+    formato: 'fisico', // NUEVO
     banco_id: '',
     chequera_id: '',
     numero: '',
@@ -193,6 +195,7 @@ export default function ChequeFormModal({ open, onClose, onSubmit, initial }) {
       setForm({
         tipo: initial?.tipo ?? 'recibido',
         canal: initial?.canal ?? 'C1',
+        formato: initial?.formato ?? 'fisico', // NUEVO
         banco_id: initial?.banco_id ?? '',
         chequera_id: initial?.chequera_id ?? '',
         numero: initial?.numero ?? '',
@@ -226,7 +229,8 @@ export default function ChequeFormModal({ open, onClose, onSubmit, initial }) {
   }, [chequeraSel, cuentas]);
 
   useEffect(() => {
-    if (form.tipo === 'emitido') {
+    if (form.tipo === 'emitido' && form.formato === 'fisico') {
+      // NUEVO condición
       if (
         bancoIdPorChequera &&
         String(form.banco_id) !== String(bancoIdPorChequera)
@@ -241,7 +245,7 @@ export default function ChequeFormModal({ open, onClose, onSubmit, initial }) {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.tipo, bancoIdPorChequera, chequeraSel?.proximo_nro]);
+  }, [form.tipo, form.formato, bancoIdPorChequera, chequeraSel?.proximo_nro]); // NUEVO: form.formato
 
   const handle = (e) => {
     const { name, value } = e.target;
@@ -255,14 +259,21 @@ export default function ChequeFormModal({ open, onClose, onSubmit, initial }) {
     if (!form.monto || Number(form.monto) <= 0) return alert('Monto inválido');
 
     if (form.tipo === 'emitido') {
-      if (!form.chequera_id) return alert('Seleccione chequera');
+      if (form.formato === 'fisico') {
+        if (!form.chequera_id) return alert('Seleccione chequera');
+      } else {
+        // eCheq emitido
+        if (!form.banco_id) return alert('Seleccione banco (emisión eCheq)');
+      }
     } else {
+      // recibido
       if (!form.banco_id) return alert('Seleccione banco');
     }
 
     const payload = {
       tipo: form.tipo,
       canal: form.canal,
+      formato: form.formato, // NUEVO
       banco_id: form.banco_id ? Number(form.banco_id) : null,
       chequera_id: form.chequera_id ? Number(form.chequera_id) : null,
       numero: Number(form.numero),
@@ -299,6 +310,23 @@ export default function ChequeFormModal({ open, onClose, onSubmit, initial }) {
 
   const titleId = 'cheque-modal-title';
   const formId = 'cheque-form';
+
+  useEffect(() => {
+    setForm((f) => {
+      // si pasamos a emitido+fisico, limpiamos banco (se infiere) y preservamos chequera
+      if (f.tipo === 'emitido' && f.formato === 'fisico') {
+        return { ...f, banco_id: f.banco_id || '' };
+      }
+      // si pasamos a emitido+echeq o a recibido, chequera no aplica
+      if (
+        (f.tipo === 'emitido' && f.formato === 'echeq') ||
+        f.tipo === 'recibido'
+      ) {
+        return { ...f, chequera_id: '' };
+      }
+      return f;
+    });
+  }, [form.tipo, form.formato]); // ojo: depende del mismo form (usa setForm con callback)
 
   return (
     <AnimatePresence>
@@ -435,6 +463,27 @@ export default function ChequeFormModal({ open, onClose, onSubmit, initial }) {
                     </select>
                   </motion.div>
 
+                  {/* Formato (NUEVO) */}
+                  <motion.div variants={fieldV}>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-200 mb-2">
+                      <Tag className="h-4 w-4 text-gray-400" />
+                      Formato <span className="text-cyan-300">*</span>
+                    </label>
+                    <select
+                      name="formato"
+                      value={form.formato}
+                      onChange={handle}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-3 text-white
+                 focus:outline-none focus:ring-2 focus:ring-cyan-300/40 focus:border-transparent"
+                    >
+                      {FORMATOS.map((f) => (
+                        <option key={f} value={f} className="bg-gray-900">
+                          {f}
+                        </option>
+                      ))}
+                    </select>
+                  </motion.div>
+
                   <motion.div variants={fieldV} className="-mt-1.5">
                     <label className="flex items-center gap-2 text-sm font-medium text-gray-200 mb-2">
                       <Building2 className="h-4 w-4 text-gray-400" />
@@ -460,8 +509,8 @@ export default function ChequeFormModal({ open, onClose, onSubmit, initial }) {
                   </motion.div>
                 </div>
 
-                {/* Chequera (solo emitido) */}
-                {form.tipo === 'emitido' && (
+                {/* Chequera (solo emitido + fisico) */}
+                {form.tipo === 'emitido' && form.formato === 'fisico' && (
                   <motion.div variants={fieldV}>
                     <label className="flex items-center gap-2 text-sm font-medium text-gray-200 mb-2">
                       <Book className="h-4 w-4 text-gray-400" />

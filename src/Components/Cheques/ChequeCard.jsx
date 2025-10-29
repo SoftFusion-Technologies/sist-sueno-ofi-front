@@ -11,7 +11,6 @@ import {
   FaHandHolding, // Entregar
   FaExchangeAlt, // Compensar
   FaBan, // Anular
-  FaMoneyCheckAlt,
   FaUniversity,
   FaBook,
   FaMoneyBill,
@@ -59,7 +58,21 @@ const Pill = ({ children, className = '' }) => (
   </span>
 );
 
-// Acciones permitidas (misma lógica)
+// Badge de formato (claro/oscuro coherente)
+const PillFormato = ({ formato }) => (
+  <span
+    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${
+      formato === 'echeq'
+        ? 'bg-cyan-400/10 text-cyan-300 ring-cyan-400/30'
+        : 'bg-amber-500/10 text-amber-700 ring-amber-400/40'
+    }`}
+    title={formato === 'echeq' ? 'Cheque electrónico' : 'Cheque físico'}
+  >
+    {formato === 'echeq' ? 'eCheq' : 'Físico'}
+  </span>
+);
+
+// Acciones permitidas
 function getAllowedActions(ch) {
   const { tipo, estado } = ch || {};
   if (tipo === 'recibido') {
@@ -121,6 +134,78 @@ const BtnGhost = ({ onClick, icon, label, tone = 'teal' }) => {
   );
 };
 
+/* =========================
+ * Estilos condicionales
+ * =======================*/
+const cardClass = (formato) =>
+  [
+    'relative overflow-hidden rounded-3xl border',
+    formato === 'echeq'
+      ? // Negro eléctrico
+        'bg-zinc-950 border-cyan-400/20 shadow-[0_18px_60px_-20px_rgba(0,255,255,0.30)]'
+      : // Claro original
+        'border-teal-200/50 bg-white shadow-[0_12px_40px_-16px_rgba(13,148,136,0.35)]'
+  ].join(' ');
+
+const txtPrimary = (f) => (f === 'echeq' ? 'text-zinc-100' : 'text-zinc-900');
+const txtMuted = (f) => (f === 'echeq' ? 'text-zinc-300' : 'text-zinc-500');
+const txtBody = (f) => (f === 'echeq' ? 'text-zinc-200' : 'text-zinc-800');
+
+/* Fondo eléctrico (solo eCheq) */
+const ElectricBg = () => (
+  <>
+    {/* halo cian/violeta */}
+    <div
+      aria-hidden
+      className="pointer-events-none absolute -top-28 -left-32 h-[22rem] w-[26rem] rounded-full blur-3xl opacity-50"
+      style={{
+        background:
+          'conic-gradient(from 180deg at 50% 50%, rgba(34,211,238,0.28), rgba(99,102,241,0.22), transparent 60%)'
+      }}
+    />
+    {/* retícula sutil */}
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-0 opacity-[0.18] mix-blend-soft-light"
+      style={{
+        backgroundImage:
+          'linear-gradient(rgba(34,211,238,0.12) 1px, transparent 1px),linear-gradient(90deg, rgba(34,211,238,0.12) 1px, transparent 1px)',
+        backgroundSize: '22px 22px'
+      }}
+    />
+    {/* ruido muy leve */}
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-0 opacity-[0.03]"
+      style={{
+        backgroundImage:
+          'radial-gradient(rgba(255,255,255,0.08) 0.5px, transparent 0.5px)',
+        backgroundSize: '3px 3px'
+      }}
+    />
+    {/* scanline animada */}
+    <motion.div
+      aria-hidden
+      className="absolute inset-x-0 h-24 -top-10"
+      initial={{ y: -120, opacity: 0.0 }}
+      animate={{ y: 420, opacity: [0, 0.25, 0] }}
+      transition={{ repeat: Infinity, duration: 3.6, ease: 'easeInOut' }}
+      style={{
+        background:
+          'linear-gradient(to bottom, rgba(34,211,238,0.00), rgba(34,211,238,0.25), rgba(34,211,238,0.00))',
+        maskImage:
+          'linear-gradient(to bottom, transparent, black 20%, black 80%, transparent)'
+      }}
+    />
+    {/* glow de borde */}
+    <span
+      aria-hidden
+      className="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-cyan-300/20"
+      style={{ boxShadow: '0 0 44px -10px rgba(34,211,238,0.38) inset' }}
+    />
+  </>
+);
+
 export default function ChequeCard({
   item,
   bancoNombre,
@@ -143,9 +228,11 @@ export default function ChequeCard({
     estado,
     fecha_emision,
     fecha_vencimiento,
-    fecha_cobro_prevista
+    fecha_cobro_prevista,
+    formato: fIn // 'fisico' | 'echeq'
   } = item;
 
+  const formato = fIn || 'fisico';
   const allowed = getAllowedActions(item);
   const handlers = {
     depositar: onActions?.depositar,
@@ -162,24 +249,39 @@ export default function ChequeCard({
       initial={{ opacity: 0, y: 16, scale: 0.985 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.25 }}
-      className="relative overflow-hidden rounded-3xl border border-teal-200/50 bg-white shadow-[0_12px_40px_-16px_rgba(13,148,136,0.35)]"
+      className={cardClass(formato)}
     >
-      {/* header gradiente sutil */}
-      <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-teal-50 to-transparent" />
+      {/* header gradiente sutil (solo físico) */}
+      {formato === 'fisico' && (
+        <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-teal-50 to-transparent" />
+      )}
+
+      {/* BG eléctrico (solo eCheq) */}
+      {formato === 'echeq' && <ElectricBg />}
 
       <div className="relative z-10 p-5 sm:p-6">
         {/* top: monto + chips */}
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-widest text-teal-600">
+            <div
+              className={`text-xs font-semibold uppercase tracking-widest ${
+                formato === 'echeq' ? 'text-cyan-300' : 'text-teal-600'
+              }`}
+            >
               Cheque #{numero}
             </div>
-            <div className="mt-1 text-2xl sm:text-3xl font-black text-zinc-900">
+            <div
+              className={`mt-1 text-2xl sm:text-3xl font-black ${txtPrimary(
+                formato
+              )}`}
+            >
               {fmt(monto)}
             </div>
-            <div className="mt-1 text-sm text-zinc-500">#{numero}</div>
+            <div className={`mt-1 text-sm ${txtMuted(formato)}`}>#{numero}</div>
           </div>
+
           <div className="flex items-center gap-2">
+            <PillFormato formato={formato} />
             <Pill className={chipTipo(tipo)}>{tipo}</Pill>
             <Pill className={chipEstado(estado)}>
               {String(estado).replaceAll('_', ' ')}
@@ -189,32 +291,88 @@ export default function ChequeCard({
 
         {/* info principal */}
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-2xl border border-zinc-200/60 p-3">
-            <div className="text-[10px] uppercase tracking-widest text-zinc-500">
+          <div
+            className={`rounded-2xl border p-3 ${
+              formato === 'echeq'
+                ? 'border-zinc-800 bg-white/5'
+                : 'border-zinc-200/60'
+            }`}
+          >
+            <div
+              className={`text-[10px] uppercase tracking-widest ${txtMuted(
+                formato
+              )}`}
+            >
               Banco
             </div>
-            <div className="mt-0.5 flex items-center gap-2 text-sm text-zinc-800">
-              <FaUniversity className="text-teal-600" /> {bancoNombre || '—'}
+            <div
+              className={`mt-0.5 flex items-center gap-2 text-sm ${txtBody(
+                formato
+              )}`}
+            >
+              <FaUniversity
+                className={
+                  formato === 'echeq' ? 'text-cyan-300' : 'text-teal-600'
+                }
+              />{' '}
+              {bancoNombre || '—'}
             </div>
           </div>
-          <div className="rounded-2xl border border-zinc-200/60 p-3">
-            <div className="text-[10px] uppercase tracking-widest text-zinc-500">
+
+          <div
+            className={`rounded-2xl border p-3 ${
+              formato === 'echeq'
+                ? 'border-zinc-800 bg-white/5'
+                : 'border-zinc-200/60'
+            }`}
+          >
+            <div
+              className={`text-[10px] uppercase tracking-widest ${txtMuted(
+                formato
+              )}`}
+            >
               Chequera
             </div>
-            <div className="mt-0.5 flex items-center gap-2 text-sm text-zinc-800">
-              <FaBook className="text-teal-600" /> {chequeraDesc || '—'}
+            <div
+              className={`mt-0.5 flex items-center gap-2 text-sm ${txtBody(
+                formato
+              )}`}
+            >
+              <FaBook
+                className={
+                  formato === 'echeq' ? 'text-cyan-300' : 'text-teal-600'
+                }
+              />{' '}
+              {chequeraDesc || '—'}
             </div>
           </div>
-          <div className="rounded-2xl border border-zinc-200/60 p-3">
-            <div className="text-[10px] uppercase tracking-widest text-zinc-500">
+
+          <div
+            className={`rounded-2xl border p-3 ${
+              formato === 'echeq'
+                ? 'border-zinc-800 bg-white/5'
+                : 'border-zinc-200/60'
+            }`}
+          >
+            <div
+              className={`text-[10px] uppercase tracking-widest ${txtMuted(
+                formato
+              )}`}
+            >
               Canal
             </div>
-            <div className="mt-0.5 text-sm text-zinc-800">{canal || 'C1'}</div>
+            <div className={`mt-0.5 text-sm ${txtBody(formato)}`}>
+              {canal || 'C1'}
+            </div>
           </div>
         </div>
 
         {/* fechas */}
-        <div className="mt-3 grid gap-2 sm:grid-cols-3 text-sm text-zinc-700">
+        <div
+          className={`mt-3 grid gap-2 sm:grid-cols-3 text-sm ${txtBody(
+            formato
+          )}`}
+        >
           <div>
             <span className="font-medium">Emisión:</span>{' '}
             {fecha_emision ? new Date(fecha_emision).toLocaleDateString() : '—'}
@@ -231,7 +389,7 @@ export default function ChequeCard({
               ? new Date(fecha_cobro_prevista).toLocaleDateString()
               : '—'}
           </div>
-          <div className="sm:col-span-3 text-[11px] text-zinc-500">
+          <div className={`sm:col-span-3 text-[11px] ${txtMuted(formato)}`}>
             ID: {id}
             {item.created_at
               ? ` — Creado: ${new Date(item.created_at).toLocaleString()}`
@@ -318,8 +476,12 @@ export default function ChequeCard({
         </div>
       </div>
 
-      {/* footer teal soft */}
-      <div className="h-3 w-full bg-gradient-to-r from-teal-100 via-transparent to-teal-100" />
+      {/* footer: teal claro vs cian/índigo eléctrico */}
+      {formato === 'fisico' ? (
+        <div className="h-3 w-full bg-gradient-to-r from-teal-100 via-transparent to-teal-100" />
+      ) : (
+        <div className="h-3 w-full bg-gradient-to-r from-cyan-400/40 via-transparent to-indigo-400/40" />
+      )}
     </motion.div>
   );
 }

@@ -61,6 +61,8 @@ export default function ChequesCards() {
   const [from, setFrom] = useState(''); // por fecha_cobro_prevista
   const [to, setTo] = useState('');
 
+  const [formato, setFormato] = useState(''); // '' | 'fisico' | 'echeq'
+
   const dq = useDebounce(q);
   const [page, setPage] = useState(1);
   const limit = 18;
@@ -127,12 +129,18 @@ export default function ChequesCards() {
         orderBy: 'created_at',
         orderDir: 'DESC'
       };
+
       if (bancoId) params.banco_id = bancoId;
       if (chequeraId) params.chequera_id = chequeraId;
       if (tipo) params.tipo = tipo;
       if (estado) params.estado = estado;
-      if (from) params.fecha_prevista_from = from;
-      if (to) params.fecha_prevista_to = to;
+
+      // ✅ usar los nombres que entiende el backend:
+      if (from) params.cobro_from = from;
+      if (to) params.cobro_to = to;
+
+      // ✅ NUEVO: formato (fisico | echeq)
+      if (formato) params.formato = formato;
 
       const data = await listCheques(params);
       if (Array.isArray(data)) {
@@ -150,9 +158,10 @@ export default function ChequesCards() {
     }
   };
 
+  // ✅ incluir "formato" como dependencia
   useEffect(() => {
     fetchData(); /* eslint-disable-next-line */
-  }, [dq, bancoId, chequeraId, tipo, estado, from, to, page]);
+  }, [dq, bancoId, chequeraId, tipo, estado, from, to, page, formato]);
 
   const nombreBanco = (id) =>
     bancos.find((b) => Number(b.id) === Number(id))?.nombre ||
@@ -464,6 +473,19 @@ export default function ChequesCards() {
                 <option value="">Tipo (todos)</option>
                 <option value="recibido">recibido</option>
                 <option value="emitido">emitido</option>
+              </select>
+
+              <select
+                value={formato}
+                onChange={(e) => {
+                  setPage(1);
+                  setFormato(e.target.value);
+                }}
+                className="px-3 py-2 rounded-xl border border-white/20 bg-white/90 focus:outline-none focus:ring-2 focus:ring-emerald-500 lg:col-span-2"
+              >
+                <option value="">Formato (todos)</option>
+                <option value="fisico">fisico</option>
+                <option value="echeq">echeq</option>
               </select>
 
               <select
