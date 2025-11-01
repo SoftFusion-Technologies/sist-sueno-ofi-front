@@ -34,6 +34,7 @@ import ChequeMovimientosTablePlus from './ChequeMovimientosTablePlus';
 import ChequeImagesManager from '../../Components/Cheques/ChequeImagesManager';
 
 import Swal from 'sweetalert2';
+import ScrollToTop from '../../Components/ScrollToTop';
 
 const useDebounce = (value, ms = 400) => {
   const [deb, setDeb] = useState(value);
@@ -431,7 +432,6 @@ export default function ChequesCards() {
         <div className="min-h-screen bg-gradient-to-b from-[#052e16] via-[#065f46] to-[#10b981]">
           <ParticlesBackground />
           <ButtonBack />
-
           <div className="text-center pt-24 px-4">
             <motion.h1
               initial={{ opacity: 0, y: -20 }}
@@ -445,7 +445,6 @@ export default function ChequesCards() {
               Gestioná cheques recibidos y emitidos, con transiciones de estado.
             </p>
           </div>
-
           {/* Filtros */}
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
@@ -578,7 +577,6 @@ export default function ChequesCards() {
               </div>
             </div>
           </div>
-
           {/* Grid */}
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {loading ? (

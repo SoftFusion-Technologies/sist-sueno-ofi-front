@@ -31,7 +31,7 @@ const ProductosGet = () => {
   const [orderDir, setOrderDir] = useState('ASC'); // ASC | DESC
   const [meta, setMeta] = useState(null);
 
-  const { userLevel } = useAuth();
+  const { userLevel, userId } = useAuth();
   const [productos, setProductos] = useState([]);
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
@@ -662,7 +662,6 @@ const ProductosGet = () => {
           </div>
         </div>
 
-        
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {rows.map((p) => (
             <motion.div
@@ -788,8 +787,6 @@ const ProductosGet = () => {
             </motion.div>
           ))}
         </div>
-
-        
 
         <Modal
           isOpen={modalOpen}
@@ -1092,7 +1089,7 @@ const ProductosGet = () => {
         producto={setupData.producto}
         proveedorInicial={setupData.proveedor}
         ppInicialId={setupData.ppId}
-        uid={getUserId?.() ?? null}
+        uid={userId}
         BASE_URL={BASE_URL}
         onRefresh={fetchData}
       />

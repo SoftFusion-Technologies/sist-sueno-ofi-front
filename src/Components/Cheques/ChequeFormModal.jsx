@@ -804,9 +804,6 @@ export default function ChequeFormModal({ open, onClose, onSubmit, initial }) {
                 </motion.div>
               </motion.form>
             </div>
-
-            {/* Línea base metálica */}
-            <div className="absolute bottom-0 left-0 w-full h-[3px] bg-gradient-to-r from-gray-400/70 via-gray-200/70 to-gray-400/70 opacity-40 rounded-b-2xl" />
           </motion.div>
         </motion.div>
       )}

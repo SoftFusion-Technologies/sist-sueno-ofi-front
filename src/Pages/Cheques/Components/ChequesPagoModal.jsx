@@ -28,7 +28,6 @@ import {
  * - onPaid?: ({ ok, total, applied }: {ok:boolean,total:number,applied:Array<{cheque_id:number,monto:number}>}) => void
  */
 
-
 function moneyAR(n) {
   try {
     return new Intl.NumberFormat('es-AR', {
