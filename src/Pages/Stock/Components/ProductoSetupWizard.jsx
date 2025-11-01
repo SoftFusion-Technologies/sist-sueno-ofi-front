@@ -1,7 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ChevronRight, CheckCircle2, Wand2 } from 'lucide-react';
-
+import {
+  X,
+  ChevronRight,
+  CheckCircle2,
+  Wand2,
+  Banknote,
+  Wallet,
+  ScrollText
+} from 'lucide-react';
+import ChequesPagoModal from '../../Cheques/Components/ChequesPagoModal';
 /**
  * ProductoSetupWizard (v2)
  *
@@ -22,6 +30,24 @@ import { X, ChevronRight, CheckCircle2, Wand2 } from 'lucide-react';
  * - BASE_URL: string
  * - onRefresh: () => void
  */
+
+// arriba del file
+import Swal from 'sweetalert2';
+import 'sweetalert2/dist/sweetalert2.min.css';
+
+const Toast = Swal.mixin({
+  toast: true,
+  position: 'top-end',
+  showConfirmButton: false,
+  timer: 2200,
+  timerProgressBar: true
+});
+
+// currency helper rápido para ARS
+const moneyAR = (n) =>
+  new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(
+    Number(n) || 0
+  );
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, Number(v) || 0));
 
@@ -96,6 +122,17 @@ export default function ProductoSetupWizard({
   // Moneda efectivamente guardada para decidir si se puede egresar directo
   const [lastSavedMoneda, setLastSavedMoneda] = useState('ARS');
 
+  const [pagarChequesOpen, setPagarChequesOpen] = useState(false);
+
+  // Forma de pago: 'efectivo' | 'caja' | 'cheques'
+  const [pagoMetodo, setPagoMetodo] = useState('caja');
+  const isCaja = pagoMetodo === 'caja';
+  const isEfectivo = pagoMetodo === 'efectivo';
+  const isCheques = pagoMetodo === 'cheques';
+
+  // Efectivo (fuera de caja)
+  const [montoEfectivo, setMontoEfectivo] = useState(0);
+  const [obsEfectivo, setObsEfectivo] = useState('');
   useEffect(() => {
     if (open && producto) {
       // ... (lo que ya tenías)
@@ -105,6 +142,9 @@ export default function ProductoSetupWizard({
       // setPostingEgreso(false);
       setLastSavedMoneda('ARS');
       setCajaActual(null);
+      setPagoMetodo('caja');
+      setMontoEfectivo(0);
+      setObsEfectivo('');
     }
   }, [open, producto]);
 
@@ -502,6 +542,7 @@ export default function ProductoSetupWizard({
             producto?.nombre || ''
           }`.trim()
         );
+        setMontoEfectivo(Number(totalCompra || 0)); // prefijar también para "Efectivo"
       } else {
         setEgresoOn(false); // si no es ARS, pedimos convertir manualmente o deshabilitamos
       }
@@ -514,27 +555,49 @@ export default function ProductoSetupWizard({
       setSaving(false);
     }
   }
+  async function marcarPagoEfectivo() {
+    try {
+      const monto = Number(montoEfectivo || 0);
+      if (!monto) {
+        return Toast.fire({ icon: 'warning', title: 'Monto inválido' });
+      }
+      // TODO endpoint real...
+      Toast.fire({ icon: 'success', title: 'Pago en efectivo registrado' });
+      onRefresh?.();
+    } catch {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'No se pudo registrar el pago en efectivo.'
+      });
+    }
+  }
 
   async function registrarEgresoCaja() {
     try {
       if (!egresoOn) return;
+
       if (!cajaActual?.id) {
-        alert('No hay caja abierta para este usuario.');
-        return;
+        return Swal.fire({
+          icon: 'warning',
+          title: 'Sin caja abierta',
+          text: 'Abrí una caja para registrar el egreso.'
+        });
       }
       if (lastSavedMoneda !== 'ARS') {
-        alert(
-          `El costo está en ${lastSavedMoneda}. Convertí a ARS o ajustá backend para manejar moneda.`
-        );
-        return;
-      }
-      const monto = Number(egresoMonto || 0);
-      if (!monto || isNaN(monto) || monto <= 0) {
-        alert('Monto inválido');
-        return;
+        return Swal.fire({
+          icon: 'info',
+          title: `Moneda ${lastSavedMoneda}`,
+          text: 'Convertí a ARS o ajustá tu backend para FX.'
+        });
       }
 
-      await fetch(`${BASE_URL}/movimientos_caja`, {
+      const monto = Number(egresoMonto || 0);
+      if (!monto) {
+        return Toast.fire({ icon: 'warning', title: 'Monto inválido' });
+      }
+
+      const res = await fetch(`${BASE_URL}/movimientos_caja`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -553,10 +616,21 @@ export default function ProductoSetupWizard({
           usuario_id: uid
         })
       });
-      alert('Egreso registrado en caja.');
-      setEgresoOn(false); // opcional: desactivar el toggle
-    } catch {
-      alert('Error al registrar egreso en caja.');
+
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '');
+        throw new Error(`HTTP ${res.status} ${txt}`);
+      }
+
+      Swal.fire({ icon: 'success', title: 'Egreso registrado' });
+      setEgresoOn(false);
+      onRefresh?.();
+    } catch (e) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error guardando egreso',
+        text: e?.message || 'Intentalo nuevamente.'
+      });
     }
   }
 
@@ -909,7 +983,7 @@ export default function ProductoSetupWizard({
               )}
 
               {step === 3 && (
-                <div className="flex flex-col gap-4 py-6">
+                <div className="flex flex-col gap-6 py-6">
                   <div className="flex items-center gap-3">
                     <CheckCircle2 className="text-emerald-500" size={32} />
                     <div>
@@ -917,104 +991,217 @@ export default function ProductoSetupWizard({
                         ¡Producto listo!
                       </h4>
                       <p className="text-gray-500 text-sm">
-                        Guardamos los datos del producto y la configuración de
-                        costos del proveedor.
+                        Guardamos los datos del producto y los costos del
+                        proveedor.
                       </p>
                     </div>
                   </div>
 
-                  <div className="rounded-xl border p-4 bg-gradient-to-br from-emerald-50/50 to-white">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-sm font-semibold text-emerald-700">
-                          ¿Registrar egreso en caja?
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          Se creará un movimiento de tipo <b>egreso</b> con la
-                          compra total.
-                        </div>
-                      </div>
-                      <label className="inline-flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4"
-                          checked={egresoOn}
-                          onChange={(e) => setEgresoOn(e.target.checked)}
-                        />
-                        <span>Registrar</span>
-                      </label>
+                  {/* Selector de forma de pago */}
+                  <div>
+                    <div className="text-sm font-semibold text-slate-800 mb-2">
+                      ¿Cómo vas a pagar esta compra?
                     </div>
-
-                    <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-xs text-gray-600 mb-1">
-                          Caja
-                        </label>
-                        <input
-                          value={
-                            cargandoCaja
-                              ? 'Buscando caja...'
-                              : cajaActual?.nombre ||
-                                (cajaActual?.id
-                                  ? `ID ${cajaActual.id}`
-                                  : 'Sin caja abierta')
-                          }
-                          readOnly
-                          className="w-full px-3 py-2 rounded-lg border bg-gray-50 text-gray-700"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-600 mb-1">
-                          Monto (ARS)
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={egresoMonto}
-                          onChange={(e) => setEgresoMonto(e.target.value)}
-                          className="w-full px-3 py-2 text-black rounded-lg border"
-                        />
-                      </div>
-                      <div className="md:col-span-3">
-                        <label className="block text-xs text-gray-600 mb-1">
-                          Descripción
-                        </label>
-                        <input
-                          value={egresoDesc}
-                          onChange={(e) => setEgresoDesc(e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg text-black border"
-                          placeholder={`Compra proveedor ${
-                            proveedorInicial?.razon_social || ''
-                          } · ${producto?.nombre || ''}`}
-                        />
-                      </div>
-
-                      {lastSavedMoneda !== 'ARS' && (
-                        <div className="md:col-span-3 text-xs text-amber-700 bg-amber-50 border border-amber-100 px-2 py-1 rounded">
-                          La moneda guardada del costo es{' '}
-                          <b>{lastSavedMoneda}</b>. Ingresá manualmente el
-                          equivalente en ARS o ajustá tu backend para registrar
-                          movimientos con moneda/FX.
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mt-3 flex justify-end">
+                    <div className="inline-flex rounded-xl border bg-slate-50 p-1 text-sm">
                       <button
-                        onClick={registrarEgresoCaja}
-                        disabled={
-                          !egresoOn ||
-                          !cajaActual?.id ||
-                          lastSavedMoneda !== 'ARS' ||
-                          Number(egresoMonto) <= 0
+                        type="button"
+                        onClick={() => setPagoMetodo('efectivo')}
+                        className={
+                          'px-3 py-1.5 rounded-lg flex items-center gap-2 text-black ' +
+                          (isEfectivo
+                            ? 'bg-white shadow border'
+                            : 'text-slate-600')
                         }
-                        className="px-4 py-2 rounded-lg bg-emerald-600 text-white disabled:opacity-60"
+                        title="Pagar en efectivo (fuera de caja)"
                       >
-                        Registrar egreso
+                        <Banknote size={16} /> Efectivo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPagoMetodo('caja')}
+                        className={
+                          'ml-1 px-3 py-1.5 rounded-lg flex items-center gap-2 text-black ' +
+                          (isCaja ? 'bg-white shadow border' : 'text-slate-600')
+                        }
+                        title="Registrar egreso desde caja"
+                      >
+                        <Wallet size={16} /> Caja
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPagoMetodo('cheques')}
+                        className={
+                          'ml-1 px-3 py-1.5 rounded-lg flex items-center gap-2 text-black ' +
+                          (isCheques
+                            ? 'bg-white shadow border'
+                            : 'text-slate-600')
+                        }
+                        title="Pagar con cheques"
+                      >
+                        <ScrollText size={16} /> Cheques
                       </button>
                     </div>
                   </div>
+
+                  {/* Contenido por método */}
+                  {isEfectivo && (
+                    <div className="rounded-xl border p-4 bg-gradient-to-br from-amber-50/60 to-white">
+                      <div className="text-sm font-semibold text-amber-800">
+                        Pago en efectivo (no impacta caja)
+                      </div>
+                      <div className="text-xs text-gray-500 mb-3">
+                        Usá esto si abonás con efectivo por fuera del sistema de
+                        caja.
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">
+                            Monto (ARS)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={montoEfectivo}
+                            onChange={(e) => setMontoEfectivo(e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg border text-black"
+                          />
+                        </div>
+                        <div className="md:col-span-3">
+                          <label className="block text-xs text-gray-600 mb-1">
+                            Observaciones
+                          </label>
+                          <input
+                            value={obsEfectivo}
+                            onChange={(e) => setObsEfectivo(e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg border text-black"
+                            placeholder="Ej: Pago en efectivo al proveedor"
+                          />
+                        </div>
+                        {lastSavedMoneda !== 'ARS' && (
+                          <div className="md:col-span-3 text-xs text-amber-700 bg-amber-50 border border-amber-100 px-2 py-1 rounded">
+                            La moneda guardada del costo es{' '}
+                            <b>{lastSavedMoneda}</b>. Asegurate de convertir a
+                            ARS para registrar el monto correcto.
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-3 flex justify-end">
+                        <button
+                          onClick={marcarPagoEfectivo}
+                          disabled={Number(montoEfectivo) <= 0}
+                          className="px-4 py-2 rounded-lg bg-amber-600 text-white disabled:opacity-60"
+                        >
+                          Marcar pago en efectivo
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {isCaja && (
+                    <div className="rounded-xl border p-4 bg-gradient-to-br from-emerald-50/50 to-white">
+                      <div className="text-sm font-semibold text-emerald-700">
+                        Registrar egreso desde caja
+                      </div>
+                      <div className="text-xs text-gray-500 mb-3">
+                        Se creará un movimiento de tipo <b>egreso</b> con la
+                        compra total.
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">
+                            Caja
+                          </label>
+                          <input
+                            value={
+                              cargandoCaja
+                                ? 'Buscando caja...'
+                                : cajaActual?.nombre ||
+                                  (cajaActual?.id
+                                    ? `ID ${cajaActual.id}`
+                                    : 'Sin caja abierta')
+                            }
+                            readOnly
+                            className="w-full px-3 py-2 rounded-lg border bg-gray-50 text-gray-700"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">
+                            Monto (ARS)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={egresoMonto}
+                            onChange={(e) => setEgresoMonto(e.target.value)}
+                            className="w-full px-3 py-2 text-black rounded-lg border"
+                          />
+                        </div>
+                        <div className="md:col-span-3">
+                          <label className="block text-xs text-gray-600 mb-1">
+                            Descripción
+                          </label>
+                          <input
+                            value={egresoDesc}
+                            onChange={(e) => setEgresoDesc(e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg text-black border"
+                            placeholder={`Compra proveedor ${
+                              proveedorInicial?.razon_social || ''
+                            } · ${producto?.nombre || ''}`}
+                          />
+                        </div>
+                        {lastSavedMoneda !== 'ARS' && (
+                          <div className="md:col-span-3 text-xs text-amber-700 bg-amber-50 border border-amber-100 px-2 py-1 rounded">
+                            La moneda guardada del costo es{' '}
+                            <b>{lastSavedMoneda}</b>. Ingresá manualmente el
+                            equivalente en ARS o ajustá tu backend para
+                            registrar movimientos con moneda/FX.
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-3 flex justify-end">
+                        <button
+                          onClick={registrarEgresoCaja}
+                          disabled={
+                            !cajaActual?.id ||
+                            lastSavedMoneda !== 'ARS' ||
+                            Number(egresoMonto) <= 0
+                          }
+                          className="px-4 py-2 rounded-lg bg-emerald-600 text-white disabled:opacity-60"
+                        >
+                          Registrar egreso
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {isCheques && (
+                    <div className="rounded-xl border p-4 bg-gradient-to-br from-slate-50 to-white">
+                      <div className="text-sm font-semibold text-slate-800">
+                        Pagar con cheques
+                      </div>
+                      <div className="text-xs text-gray-500 mb-3">
+                        Abrí el modal para seleccionar cheques y aplicar el
+                        pago.
+                      </div>
+                      {lastSavedMoneda !== 'ARS' && (
+                        <div className="mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-100 px-2 py-1 rounded">
+                          La moneda guardada del costo es{' '}
+                          <b>{lastSavedMoneda}</b>. Convertí a ARS si tus
+                          cheques están en ARS.
+                        </div>
+                      )}
+                      <div className="flex justify-end">
+                        <button
+                          onClick={() => setPagarChequesOpen(true)}
+                          className="px-4 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800"
+                        >
+                          Abrir cheques
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1083,6 +1270,45 @@ export default function ProductoSetupWizard({
               </div>
             </div>
           </motion.div>
+          <ChequesPagoModal
+            open={pagarChequesOpen}
+            onClose={() => setPagarChequesOpen(false)}
+            BASE_URL={BASE_URL}
+            uid={uid}
+            proveedor={proveedorInicial}
+            compraId={null}
+            cajaId={cajaActual?.id || null}
+            totalCompraARS={Number((compraPreview?.total || 0).toFixed(2))}
+            productoNombre={producto?.nombre}
+            onPaid={({ total, detalle }) => {
+              setPagarChequesOpen(false);
+
+              // Modal “OK” con detalle opcional
+              Swal.fire({
+                icon: 'success',
+                title: 'Pago con cheques registrado',
+                html: `
+        <div style="text-align:left">
+          <b>Total aplicado:</b> ${moneyAR(total)}<br/>
+          ${
+            Array.isArray(detalle) && detalle.length
+              ? `<b>Cheques:</b><br/>${detalle
+                  .map(
+                    (d) =>
+                      `• #${d.numero ?? d.id} — ${moneyAR(d.monto)}${
+                        d.banco ? ` (${d.banco})` : ''
+                      }`
+                  )
+                  .join('<br/>')}`
+              : ''
+          }
+        </div>
+      `
+              });
+
+              onRefresh?.(); // refresca proveedor/kpis/listados
+            }}
+          />
         </motion.div>
       )}
     </AnimatePresence>
