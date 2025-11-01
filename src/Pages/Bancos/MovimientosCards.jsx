@@ -353,136 +353,208 @@ export default function MovimientosCards() {
           </div>
 
           {/* Filtros */}
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
-              <div className="relative lg:col-span-3">
-                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  value={q}
-                  onChange={(e) => {
-                    setPage(1);
-                    setQ(e.target.value);
-                  }}
-                  placeholder="Buscar descripción…"
-                  className="w-full pl-10 pr-3 py-2 rounded-xl border border-white/20 bg-white/90 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                />
-              </div>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 overflow-x-hidden">
+            {/* Card emerald/lemon estándar */}
+            <div className="rounded-2xl border border-emerald-600/20 bg-gradient-to-br from-emerald-600/15 via-lime-400/10 to-emerald-500/10 backdrop-blur-xl shadow-lg ring-1 ring-emerald-600/20 p-3 sm:p-4 overflow-hidden">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+                {/* Buscar (3) */}
+                <div className="relative lg:col-span-3 min-w-0">
+                  <FaSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600" />
+                  <input
+                    value={q}
+                    onChange={(e) => {
+                      setPage(1);
+                      setQ(e.target.value);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape' && q) {
+                        setPage(1);
+                        setQ('');
+                      }
+                    }}
+                    autoComplete="off"
+                    spellCheck={false}
+                    placeholder="Buscar descripción… (Esc limpia)"
+                    className="w-full pl-10 pr-3 h-10 text-sm rounded-xl border border-emerald-600/30 bg-white/80 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-50 placeholder-emerald-700/60 dark:placeholder-emerald-200/50 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-emerald-500 focus:ring-offset-2 focus:ring-offset-emerald-50 dark:focus:ring-offset-emerald-900"
+                  />
+                </div>
 
-              <select
-                value={bancoId}
-                onChange={(e) => {
-                  setPage(1);
-                  setBancoId(e.target.value);
-                }}
-                className="px-3 py-2 rounded-xl border border-white/20 bg-white/90 focus:outline-none focus:ring-2 focus:ring-teal-500 lg:col-span-2"
-              >
-                <option value="">Banco (todos)</option>
-                {bancos.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.nombre}
-                  </option>
-                ))}
-              </select>
+                {/* Banco (2) */}
+                <div className="relative lg:col-span-2 min-w-0">
+                  <select
+                    value={bancoId}
+                    onChange={(e) => {
+                      setPage(1);
+                      setBancoId(e.target.value);
+                    }}
+                    className="appearance-none w-full pl-3 pr-10 h-10 text-sm rounded-xl border border-emerald-600/30 bg-white/80 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-50 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:ring-offset-2 focus:ring-offset-emerald-50 dark:focus:ring-offset-emerald-900"
+                  >
+                    <option value="">Banco (todos)</option>
+                    {bancos.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.nombre}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-emerald-600">
+                    ▾
+                  </span>
+                </div>
 
-              <select
-                value={cuentaId}
-                onChange={(e) => {
-                  setPage(1);
-                  setCuentaId(e.target.value);
-                }}
-                className="px-3 py-2 rounded-xl border border-white/20 bg-white/90 focus:outline-none focus:ring-2 focus:ring-teal-500 lg:col-span-2"
-              >
-                <option value="">Cuenta (todas)</option>
-                {cuentas.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre_cuenta}
-                  </option>
-                ))}
-              </select>
+                {/* Cuenta (2) */}
+                <div className="relative lg:col-span-2 min-w-0">
+                  <select
+                    value={cuentaId}
+                    onChange={(e) => {
+                      setPage(1);
+                      setCuentaId(e.target.value);
+                    }}
+                    className="appearance-none w-full pl-3 pr-10 h-10 text-sm rounded-xl border border-emerald-600/30 bg-white/80 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-50 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:ring-offset-2 focus:ring-offset-emerald-50 dark:focus:ring-offset-emerald-900"
+                  >
+                    <option value="">Cuenta (todas)</option>
+                    {cuentas.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre_cuenta}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-emerald-600">
+                    ▾
+                  </span>
+                </div>
 
-              <select
-                value={tipo}
-                onChange={(e) => {
-                  setPage(1);
-                  setTipo(e.target.value);
-                }}
-                className="px-3 py-2 rounded-xl border border-white/20 bg-white/90 focus:outline-none focus:ring-2 focus:ring-teal-500 lg:col-span-2"
-              >
-                <option value="todos">Tipo (todos)</option>
-                <option value="credito">Crédito</option>
-                <option value="debito">Débito</option>
-              </select>
+                {/* Tipo (2) */}
+                <div className="relative lg:col-span-2 min-w-0">
+                  <select
+                    value={tipo}
+                    onChange={(e) => {
+                      setPage(1);
+                      setTipo(e.target.value);
+                    }}
+                    className="appearance-none w-full pl-3 pr-10 h-10 text-sm rounded-xl border border-emerald-600/30 bg-white/80 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-50 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:ring-offset-2 focus:ring-offset-emerald-50 dark:focus:ring-offset-emerald-900"
+                  >
+                    <option value="todos">Tipo (todos)</option>
+                    <option value="credito">Crédito</option>
+                    <option value="debito">Débito</option>
+                  </select>
+                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-emerald-600">
+                    ▾
+                  </span>
+                </div>
 
-              <select
-                value={refTipo}
-                onChange={(e) => {
-                  setPage(1);
-                  setRefTipo(e.target.value);
-                }}
-                className="px-3 py-2 rounded-xl border border-white/20 bg-white/90 focus:outline-none focus:ring-2 focus:ring-teal-500 lg:col-span-1"
-              >
-                <option value="">Ref (todas)</option>
-                <option value="cheque">cheque</option>
-                <option value="transferencia">transferencia</option>
-                <option value="venta">venta</option>
-                <option value="compra">compra</option>
-                <option value="pago">pago</option>
-                <option value="deposito">deposito</option>
-                <option value="conciliacion">conciliacion</option>
-                <option value="otro">otro</option>
-              </select>
+                {/* RefTipo (1) */}
+                <div className="relative lg:col-span-1 min-w-0">
+                  <select
+                    value={refTipo}
+                    onChange={(e) => {
+                      setPage(1);
+                      setRefTipo(e.target.value);
+                    }}
+                    className="appearance-none w-full pl-3 pr-10 h-10 text-sm rounded-xl border border-emerald-600/30 bg-white/80 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-50 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:ring-offset-2 focus:ring-offset-emerald-50 dark:focus:ring-offset-emerald-900"
+                  >
+                    <option value="">Ref (todas)</option>
+                    <option value="cheque">cheque</option>
+                    <option value="transferencia">transferencia</option>
+                    <option value="venta">venta</option>
+                    <option value="compra">compra</option>
+                    <option value="pago">pago</option>
+                    <option value="deposito">deposito</option>
+                    <option value="conciliacion">conciliacion</option>
+                    <option value="otro">otro</option>
+                  </select>
+                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-emerald-600">
+                    ▾
+                  </span>
+                </div>
 
-              <div className="flex items-center gap-2 lg:col-span-2">
-                <input
-                  type="date"
-                  value={from}
-                  onChange={(e) => {
-                    setPage(1);
-                    setFrom(e.target.value);
-                  }}
-                  className="px-3 py-2 rounded-xl border border-white/20 bg-white/90 focus:outline-none focus:ring-2 focus:ring-teal-500 w-full"
-                />
-                <span className="text-white/80">→</span>
-                <input
-                  type="date"
-                  value={to}
-                  onChange={(e) => {
-                    setPage(1);
-                    setTo(e.target.value);
-                  }}
-                  className="px-3 py-2 rounded-xl border border-white/20 bg-white/90 focus:outline-none focus:ring-2 focus:ring-teal-500 w-full"
-                />
-              </div>
+                {/* Rango fechas (2) — FIX: grid responsivo sin flecha */}
+                <div className="lg:col-span-2 min-w-0">
+                  <label className="block text-xs font-semibold text-emerald-800 dark:text-emerald-200 mb-1">
+                    Rango de fechas
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="min-w-0">
+                      <label htmlFor="fromDate" className="sr-only">
+                        Desde
+                      </label>
+                      <input
+                        id="fromDate"
+                        type="date"
+                        value={from}
+                        onChange={(e) => {
+                          setPage(1);
+                          setFrom(e.target.value);
+                        }}
+                        className="w-full min-w-0 px-3 h-10 text-sm rounded-xl border border-emerald-600/30 bg-white/80 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-50 focus:outline-none focus:ring-2 focus:ring-lime-400"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <label htmlFor="toDate" className="sr-only">
+                        Hasta
+                      </label>
+                      <input
+                        id="toDate"
+                        type="date"
+                        value={to}
+                        onChange={(e) => {
+                          setPage(1);
+                          setTo(e.target.value);
+                        }}
+                        className="w-full min-w-0 px-3 h-10 text-sm rounded-xl border border-emerald-600/30 bg-white/80 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-50 focus:outline-none focus:ring-2 focus:ring-lime-400"
+                      />
+                    </div>
+                  </div>
+                </div>
 
-              <label className="inline-flex items-center gap-2 text-white/90 lg:col-span-2">
-                <input
-                  type="checkbox"
-                  checked={inclSaldo}
-                  onChange={(e) => setInclSaldo(e.target.checked)}
-                />
-                Incluir saldo acumulado
-              </label>
+                {/* Fila 2 */}
+                {/* Checkbox saldo (3) */}
+                <label className="inline-flex items-center gap-2 text-emerald-900 dark:text-emerald-50 lg:col-span-3">
+                  <input
+                    type="checkbox"
+                    checked={inclSaldo}
+                    onChange={(e) => setInclSaldo(e.target.checked)}
+                    className="h-4 w-4 rounded accent-emerald-600"
+                  />
+                  Incluir saldo acumulado
+                </label>
 
-              <div className="flex items-center gap-2 lg:col-span-3">
-                <button
-                  onClick={() => setModalOpen(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-600 text-white font-semibold hover:bg-teal-700"
-                >
-                  <FaPlus /> Nuevo Movimiento
-                </button>
-                {/* <button
-                  onClick={() =>
-                    exportMovimientosCSV({
-                      banco_cuenta_id: cuentaId || cuentas[0]?.id || '',
-                      from: from || '1900-01-01',
-                      to: to || '9999-12-31'
-                    })
-                  }
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-600 text-white font-semibold hover:bg-sky-700 disabled:opacity-60"
-                  disabled={!cuentaId && cuentas.length === 0}
-                >
-                  <FaDownload /> Export CSV
-                </button> */}
+                {/* Acciones (9) */}
+                <div className="flex flex-wrap items-center gap-2 lg:col-span-9">
+                  <button
+                    onClick={() => setModalOpen(true)}
+                    className="inline-flex items-center gap-2 px-4 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-lime-500 text-emerald-50 font-semibold shadow-[0_6px_20px_-5px_rgba(16,185,129,0.45)] hover:from-emerald-700 hover:to-lime-600 focus:outline-none focus:ring-2 focus:ring-lime-400"
+                  >
+                    <FaPlus /> Nuevo Movimiento
+                  </button>
+
+                  {(q ||
+                    bancoId ||
+                    cuentaId ||
+                    tipo !== 'todos' ||
+                    refTipo ||
+                    from ||
+                    to ||
+                    inclSaldo) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPage(1);
+                        setQ('');
+                        setBancoId('');
+                        setCuentaId('');
+                        setTipo('todos');
+                        setRefTipo('');
+                        setFrom('');
+                        setTo('');
+                        setInclSaldo(false);
+                      }}
+                      className="px-4 h-10 rounded-xl bg-lime-50 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-50 border border-lime-300/60 dark:border-emerald-700 hover:bg-lime-100 dark:hover:bg-emerald-900/50"
+                      title="Limpiar filtros"
+                    >
+                      Limpiar
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>

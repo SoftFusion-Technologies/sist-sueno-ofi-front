@@ -253,73 +253,205 @@ export default function CuentasCards() {
           </div>
 
           {/* Filtros / acciones */}
+          {/* Filtros / acciones */}
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
-            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
-              <div className="relative flex-1">
-                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  value={q}
-                  onChange={(e) => {
-                    setPage(1);
-                    setQ(e.target.value);
-                  }}
-                  placeholder="Buscar por nombre, nro de cuenta, CBU, alias…"
-                  className="w-full pl-10 pr-3 py-2 rounded-xl border border-white/20 bg-white/90 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                />
+            {/* Card con vibra emerald + lemon */}
+            <div className="rounded-2xl border border-emerald-600/20 bg-gradient-to-br from-emerald-600/15 via-lime-400/10 to-emerald-500/10 backdrop-blur-xl shadow-lg ring-1 ring-emerald-600/20 p-3 sm:p-4">
+              <div className="flex flex-col md:flex-row md:items-center gap-3">
+                {/* Búsqueda */}
+                <div className="relative flex-1">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600">
+                    <FaSearch />
+                  </span>
+                  <input
+                    value={q}
+                    onChange={(e) => {
+                      setPage(1);
+                      setQ(e.target.value);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape' && q) {
+                        setPage(1);
+                        setQ('');
+                      }
+                    }}
+                    autoComplete="off"
+                    spellCheck={false}
+                    placeholder="Buscar por nombre, nro de cuenta, CBU, alias… (Esc limpia)"
+                    className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-emerald-600/30 bg-white/80 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-50 placeholder-emerald-700/60 dark:placeholder-emerald-200/50 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:border-emerald-500 focus:ring-offset-2 focus:ring-offset-emerald-50 dark:focus:ring-offset-emerald-900 transition"
+                  />
+                  {/* Limpiar */}
+                  {q && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPage(1);
+                        setQ('');
+                      }}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 h-7 w-7 flex items-center justify-center rounded-full text-emerald-700 dark:text-emerald-200 hover:bg-lime-300/30"
+                      title="Limpiar búsqueda"
+                      aria-label="Limpiar búsqueda"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+
+                {/* Selectores + CTA */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Banco */}
+                  <div className="relative">
+                    <select
+                      value={bancoId}
+                      onChange={(e) => {
+                        setPage(1);
+                        setBancoId(e.target.value);
+                      }}
+                      className="appearance-none pl-3 pr-8 py-2 rounded-xl border border-emerald-600/30 bg-white/80 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-50 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:ring-offset-2 focus:ring-offset-emerald-50 dark:focus:ring-offset-emerald-900"
+                    >
+                      <option value="">Banco (todos)</option>
+                      {bancos.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.nombre}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-emerald-600">
+                      ▾
+                    </span>
+                  </div>
+
+                  {/* Moneda */}
+                  <div className="relative">
+                    <select
+                      value={moneda}
+                      onChange={(e) => {
+                        setPage(1);
+                        setMoneda(e.target.value);
+                      }}
+                      className="appearance-none pl-3 pr-8 py-2 rounded-xl border border-emerald-600/30 bg-white/80 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-50 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:ring-offset-2 focus:ring-offset-emerald-50 dark:focus:ring-offset-emerald-900"
+                    >
+                      <option value="">Moneda (todas)</option>
+                      <option value="ARS">ARS</option>
+                      <option value="USD">USD</option>
+                      <option value="EUR">EUR</option>
+                      <option value="OTRA">OTRA</option>
+                    </select>
+                    <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-emerald-600">
+                      ▾
+                    </span>
+                  </div>
+
+                  {/* Estado */}
+                  <div className="relative">
+                    <select
+                      value={estado}
+                      onChange={(e) => {
+                        setPage(1);
+                        setEstado(e.target.value);
+                      }}
+                      className="appearance-none pl-3 pr-8 py-2 rounded-xl border border-emerald-600/30 bg-white/80 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-50 focus:outline-none focus:ring-2 focus:ring-lime-400 focus:ring-offset-2 focus:ring-offset-emerald-50 dark:focus:ring-offset-emerald-900"
+                    >
+                      <option value="todos">Todos</option>
+                      <option value="activos">Activos</option>
+                      <option value="inactivos">Inactivos</option>
+                    </select>
+                    <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-emerald-600">
+                      ▾
+                    </span>
+                  </div>
+
+                  {/* Limpiar todos */}
+                  {(q ||
+                    bancoId ||
+                    moneda ||
+                    (estado && estado !== 'todos')) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPage(1);
+                        setQ('');
+                        setBancoId('');
+                        setMoneda('');
+                        setEstado('todos');
+                      }}
+                      className="px-3 py-2 rounded-xl bg-lime-50 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-50 border border-lime-300/60 dark:border-emerald-700 hover:bg-lime-100 dark:hover:bg-emerald-900/50"
+                      title="Limpiar filtros"
+                    >
+                      Limpiar
+                    </button>
+                  )}
+
+                  {/* CTA Nueva Cuenta */}
+                  <button
+                    onClick={onNew}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-tr from-emerald-600 to-lime-500 text-emerald-50 font-semibold shadow-[0_6px_20px_-5px_rgba(16,185,129,0.45)] hover:from-emerald-700 hover:to-lime-600 focus:outline-none focus:ring-2 focus:ring-lime-400"
+                  >
+                    <FaPlus /> Nueva Cuenta
+                  </button>
+                </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <select
-                  value={bancoId}
-                  onChange={(e) => {
-                    setPage(1);
-                    setBancoId(e.target.value);
-                  }}
-                  className="px-3 py-2 rounded-xl border border-white/20 bg-white/90 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                >
-                  <option value="">Banco (todos)</option>
-                  {bancos.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.nombre}
-                    </option>
-                  ))}
-                </select>
-
-                <select
-                  value={moneda}
-                  onChange={(e) => {
-                    setPage(1);
-                    setMoneda(e.target.value);
-                  }}
-                  className="px-3 py-2 rounded-xl border border-white/20 bg-white/90 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                >
-                  <option value="">Moneda (todas)</option>
-                  <option value="ARS">ARS</option>
-                  <option value="USD">USD</option>
-                  <option value="EUR">EUR</option>
-                  <option value="OTRA">OTRA</option>
-                </select>
-
-                <select
-                  value={estado}
-                  onChange={(e) => {
-                    setPage(1);
-                    setEstado(e.target.value);
-                  }}
-                  className="px-3 py-2 rounded-xl border border-white/20 bg-white/90 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                >
-                  <option value="todos">Todos</option>
-                  <option value="activos">Activos</option>
-                  <option value="inactivos">Inactivos</option>
-                </select>
-
-                <button
-                  onClick={onNew}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-600 text-white font-semibold hover:bg-teal-700"
-                >
-                  <FaPlus /> Nueva Cuenta
-                </button>
-              </div>
+              {/* Chips activos (emerald/lemon) */}
+              {(q || bancoId || moneda || (estado && estado !== 'todos')) && (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {q && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPage(1);
+                        setQ('');
+                      }}
+                      className="px-2.5 py-1.5 text-sm rounded-full bg-lime-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-50 border border-lime-300/70 dark:border-emerald-800 hover:bg-lime-200 dark:hover:bg-emerald-900/50"
+                      title="Quitar filtro de texto"
+                    >
+                      Texto: “{q}” ×
+                    </button>
+                  )}
+                  {bancoId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPage(1);
+                        setBancoId('');
+                      }}
+                      className="px-2.5 py-1.5 text-sm rounded-full bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-50 border border-emerald-300/70 dark:border-emerald-800 hover:bg-emerald-200 dark:hover:bg-emerald-900/50"
+                      title="Quitar filtro Banco"
+                    >
+                      Banco:{' '}
+                      {bancos.find((b) => String(b.id) === String(bancoId))
+                        ?.nombre || bancoId}{' '}
+                      ×
+                    </button>
+                  )}
+                  {moneda && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPage(1);
+                        setMoneda('');
+                      }}
+                      className="px-2.5 py-1.5 text-sm rounded-full bg-lime-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-50 border border-lime-300/70 dark:border-emerald-800 hover:bg-lime-200 dark:hover:bg-emerald-900/50"
+                      title="Quitar filtro Moneda"
+                    >
+                      Moneda: {moneda} ×
+                    </button>
+                  )}
+                  {estado && estado !== 'todos' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPage(1);
+                        setEstado('todos');
+                      }}
+                      className="px-2.5 py-1.5 text-sm rounded-full bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-50 border border-emerald-300/70 dark:border-emerald-800 hover:bg-emerald-200 dark:hover:bg-emerald-900/50"
+                      title="Quitar filtro Estado"
+                    >
+                      Estado: {estado} ×
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
