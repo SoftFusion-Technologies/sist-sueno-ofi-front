@@ -1,5 +1,12 @@
 // src/Components/Common/SearchableSelect.jsx
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState
+} from 'react';
 import { createPortal } from 'react-dom';
 
 export default function SearchableSelect({
@@ -17,15 +24,23 @@ export default function SearchableSelect({
   dropdownMaxHeight = '60vh',
   portalZIndex = 2000,
   menuPlacement = 'auto',
-  getOptionSearchText = (o, getLabel) => getLabel(o) || ''
+  getOptionSearchText = (o, getLabel) => getLabel(o) || '',
+  lockBodyScroll = false,
+  withBackdrop = true
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
   const rootRef = useRef(null);
   const menuRef = useRef(null);
+  const inputRef = useRef(null);
+
   const [menuStyle, setMenuStyle] = useState({});
   const [placement, setPlacement] = useState('bottom');
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [isPositioned, setIsPositioned] = useState(false);
+
+  const backdropTap = useRef({ x: 0, y: 0, armed: false });
+
   const listboxId = useRef(
     `ss-list-${Math.random().toString(36).slice(2)}`
   ).current;
@@ -45,34 +60,34 @@ export default function SearchableSelect({
   const filtered = useMemo(() => {
     const s = normalize(q.trim());
     if (!s) return items;
-    return items.filter((i) => {
-      const haystack = normalize(getOptionSearchText(i, getOptionLabel));
-      return haystack.includes(s);
-    });
+    return items.filter((i) =>
+      normalize(getOptionSearchText(i, getOptionLabel)).includes(s)
+    );
   }, [items, q, getOptionLabel, getOptionSearchText]);
 
+  // ===== Scroll-lock del body (opcional) =====
   useEffect(() => {
-    if (!open) return;
-    const onDocClick = (e) => {
-      const root = rootRef.current;
-      const menu = menuRef.current;
-      if (root?.contains(e.target)) return;
-      if (menu?.contains(e.target)) return;
-      setOpen(false);
-      setActiveIndex(-1);
-    };
-    document.addEventListener('mousedown', onDocClick);
-    return () => document.removeEventListener('mousedown', onDocClick);
-  }, [open]);
+    if (!portal || !lockBodyScroll) return;
+    if (open) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = prev;
+      };
+    }
+  }, [open, portal, lockBodyScroll]);
 
-  const updatePosition = () => {
+  // ===== Posicionamiento del menú cuando es portal =====
+  const computePosition = useCallback(() => {
     if (!portal || !rootRef.current) return;
+
     const rect = rootRef.current.getBoundingClientRect();
     const vw = window.innerWidth;
     const vh = window.innerHeight;
 
     const spaceAbove = rect.top;
     const spaceBelow = vh - rect.bottom;
+
     let want = menuPlacement;
     if (menuPlacement === 'auto') {
       want = spaceBelow >= 240 || spaceBelow >= spaceAbove ? 'bottom' : 'top';
@@ -81,34 +96,98 @@ export default function SearchableSelect({
 
     const width = Math.min(rect.width, vw - 16);
     const left = Math.min(Math.max(8, rect.left), vw - width - 8);
+
+    const maxHpx =
+      want === 'bottom'
+        ? Math.max(120, Math.min(spaceBelow - 8, vh * 0.6))
+        : Math.max(120, Math.min(spaceAbove - 8, vh * 0.6));
+
     const top =
       want === 'bottom'
         ? Math.min(rect.bottom + 8, vh - 8)
-        : Math.max(8, rect.top - 8);
+        : Math.max(8, rect.top - maxHpx - 8);
 
-    setMenuStyle({
+    // 👉 FIX: no pisamos visibility a 'hidden' si ya está en 'visible'
+    setMenuStyle((prev) => ({
+      ...prev,
       position: 'fixed',
       top,
       left,
       width,
-      maxHeight: dropdownMaxHeight,
-      zIndex: portalZIndex
-    });
-  };
+      maxHeight: `${maxHpx}px`,
+      zIndex: portalZIndex + 1,
+      visibility: prev.visibility || 'hidden', // primera vez 'hidden', luego respetamos 'visible'
+      overflowY: 'auto',
+      WebkitOverflowScrolling: 'touch'
+    }));
+    setIsPositioned(true);
+  }, [portal, menuPlacement, portalZIndex]);
+
+  useLayoutEffect(() => {
+    if (!portal || !open) return;
+    computePosition();
+  }, [open, portal, computePosition]);
 
   useEffect(() => {
-    if (!portal) return;
-    const onScroll = () => open && updatePosition();
-    const onResize = () => open && updatePosition();
+    if (!portal || !open) return;
+    const onScroll = () => computePosition();
+    const onResize = () => computePosition();
     window.addEventListener('scroll', onScroll, true);
     window.addEventListener('resize', onResize);
-    if (open) updatePosition();
     return () => {
       window.removeEventListener('scroll', onScroll, true);
       window.removeEventListener('resize', onResize);
     };
-  }, [open, portal, menuPlacement]);
+  }, [open, portal, computePosition]);
 
+  // ===== Foco (sin saltos de scroll) =====
+  useEffect(() => {
+    if (!open) return;
+    const focusInput = () => {
+      if (inputRef.current) {
+        try {
+          inputRef.current.focus({ preventScroll: true });
+        } catch {
+          inputRef.current.focus();
+        }
+      }
+      if (portal) {
+        // aseguramos que quede visible al menos una vez
+        setMenuStyle((s) => ({ ...s, visibility: 'visible' }));
+      }
+    };
+    if (portal) {
+      if (isPositioned) requestAnimationFrame(focusInput);
+    } else {
+      requestAnimationFrame(focusInput);
+    }
+  }, [open, portal, isPositioned]);
+
+  // ===== Cierre por click externo =====
+  useEffect(() => {
+    if (!open) return;
+
+    const isInside = (node, e) => {
+      if (!node) return false;
+      const path = e.composedPath ? e.composedPath() : [];
+      return path.includes(node) || node.contains(e.target);
+    };
+
+    if (!portal || !withBackdrop) {
+      const onDocPointerDown = (e) => {
+        const root = rootRef.current;
+        const menu = menuRef.current;
+        if (isInside(root, e) || isInside(menu, e)) return;
+        setOpen(false);
+        setActiveIndex(-1);
+      };
+      document.addEventListener('pointerdown', onDocPointerDown, true);
+      return () =>
+        document.removeEventListener('pointerdown', onDocPointerDown, true);
+    }
+  }, [open, portal, withBackdrop]);
+
+  // ===== Navegación por teclado =====
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => {
@@ -123,6 +202,12 @@ export default function SearchableSelect({
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         setActiveIndex((i) => Math.max((i ?? filtered.length) - 1, 0));
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        setActiveIndex(0);
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        setActiveIndex(filtered.length - 1);
       } else if (e.key === 'Enter') {
         if (activeIndex >= 0 && activeIndex < filtered.length) {
           const opt = filtered[activeIndex];
@@ -143,9 +228,25 @@ export default function SearchableSelect({
     return () => window.removeEventListener('keydown', onKey);
   }, [open, filtered, activeIndex, onChange, getOptionValue]);
 
+  // 👉 Extra: auto-scroll al item activo al navegar con teclado
+  useEffect(() => {
+    if (!open) return;
+    if (activeIndex < 0) return;
+    if (!menuRef.current) return;
+
+    const list = menuRef.current.querySelector('ul[role="listbox"]');
+    if (!list) return;
+    const item = list.querySelector(`li[data-idx="${activeIndex}"]`);
+    if (item && item.scrollIntoView) {
+      item.scrollIntoView({ block: 'nearest' });
+    }
+  }, [activeIndex, open]);
+
   const renderHighlighted = (text, query) => {
     if (!query) return text;
-    const i = text.toLowerCase().indexOf(query.toLowerCase());
+    const nText = text.toLowerCase();
+    const nQ = query.toLowerCase();
+    const i = nText.indexOf(nQ);
     if (i === -1) return text;
     return (
       <>
@@ -162,7 +263,12 @@ export default function SearchableSelect({
     <button
       type="button"
       disabled={disabled}
-      onClick={() => !disabled && (setOpen((v) => !v), setActiveIndex(-1))}
+      onClick={() => {
+        if (disabled) return;
+        setIsPositioned(false);
+        setOpen((v) => !v);
+        setActiveIndex(-1);
+      }}
       className={`w-full px-4 py-2 rounded-lg border bg-white text-gray-800 flex items-center justify-between ${
         disabled
           ? 'border-gray-200 opacity-60 cursor-not-allowed'
@@ -174,6 +280,11 @@ export default function SearchableSelect({
       aria-autocomplete="list"
       aria-haspopup="listbox"
       aria-required={required}
+      aria-activedescendant={
+        activeIndex >= 0 && filtered[activeIndex]
+          ? `${listboxId}-opt-${getOptionValue(filtered[activeIndex])}`
+          : undefined
+      }
     >
       <span className={`truncate ${selected ? '' : 'text-gray-500'}`}>
         {selected ? getOptionLabel(selected) : placeholder}
@@ -182,17 +293,30 @@ export default function SearchableSelect({
     </button>
   );
 
-  const MenuInner = (
+  const MenuPanel = (
     <div
       ref={menuRef}
-      className={`mt-2 w-full rounded-xl border border-gray-200 bg-white shadow-xl ${
+      onPointerDownCapture={(e) => e.stopPropagation()}
+      className={`mt-2 w-full rounded-xl border border-gray-200 bg-white shadow-2xl flex flex-col ${
         portal ? '' : 'absolute z-50'
-      } ${placement === 'top' && !portal ? 'bottom-full mb-2' : ''}`}
-      style={portal ? menuStyle : {}}
+      } ${
+        !portal ? (placement === 'top' ? 'bottom-full mb-2' : 'max-h-80') : ''
+      }`}
+      style={
+        portal
+          ? menuStyle
+          : {
+              maxHeight: dropdownMaxHeight,
+              overflowY: 'auto',
+              WebkitOverflowScrolling: 'touch'
+            }
+      }
+      role="dialog"
+      aria-modal="true"
     >
       <div className="p-2 border-b border-gray-200 sticky top-0 bg-white">
         <input
-          autoFocus
+          ref={inputRef}
           type="text"
           value={q}
           onChange={(e) => {
@@ -200,11 +324,15 @@ export default function SearchableSelect({
             setActiveIndex(-1);
           }}
           placeholder="Buscar…"
-          className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none"
+          className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-400 transition"
         />
       </div>
 
-      <ul id={listboxId} role="listbox" className="max-h-60 overflow-auto py-1">
+      <ul
+        id={listboxId}
+        role="listbox"
+        className="flex-1 overflow-y-auto py-1 overscroll-contain"
+      >
         {filtered.length === 0 && (
           <li className="px-3 py-2 text-sm text-gray-500 select-none">
             Sin resultados
@@ -218,21 +346,25 @@ export default function SearchableSelect({
           return (
             <li
               key={id}
+              id={`${listboxId}-opt-${id}`}
               data-idx={idx}
               role="option"
               aria-selected={isSel}
               onMouseEnter={() => setActiveIndex(idx)}
               onMouseLeave={() => setActiveIndex(-1)}
+              // mantenemos preventDefault para no robar foco, pero el click sigue funcionando
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
                 onChange?.(id, opt);
                 setOpen(false);
                 setQ('');
                 setActiveIndex(-1);
               }}
-              className={`px-3 py-2 text-sm cursor-pointer hover:bg-gray-100
-                ${isSel ? 'bg-cyan-50 text-cyan-700 font-semibold' : ''} ${
-                isActive ? 'bg-gray-50' : ''
-              }`}
+              className={`px-3 py-2 text-sm cursor-pointer select-none hover:bg-gray-50 active:bg-gray-100 ${
+                isSel
+                  ? 'bg-cyan-50 text-cyan-700 font-semibold ring-1 ring-cyan-100'
+                  : ''
+              } ${isActive ? 'bg-gray-50' : ''}`}
             >
               {renderHighlighted(lab, q)}
             </li>
@@ -243,6 +375,7 @@ export default function SearchableSelect({
       <div className="p-2 flex items-center justify-between border-t border-gray-200 sticky bottom-0 bg-white">
         <button
           type="button"
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => {
             onChange?.('');
             setQ('');
@@ -255,6 +388,7 @@ export default function SearchableSelect({
         </button>
         <button
           type="button"
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => {
             setOpen(false);
             setActiveIndex(-1);
@@ -267,13 +401,48 @@ export default function SearchableSelect({
     </div>
   );
 
+  const Backdrop =
+    withBackdrop && open ? (
+      <div
+        onPointerDown={(e) => {
+          backdropTap.current = { x: e.clientX, y: e.clientY, armed: true };
+        }}
+        onPointerMove={(e) => {
+          const dx = e.clientX - backdropTap.current.x;
+          const dy = e.clientY - backdropTap.current.y;
+          if (dx * dx + dy * dy > 36) backdropTap.current.armed = false;
+        }}
+        onPointerUp={() => {
+          if (backdropTap.current.armed) {
+            setOpen(false);
+            setActiveIndex(-1);
+          }
+        }}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: portalZIndex,
+          background: 'transparent'
+          // ojo: saqué touchAction: 'none' para no interferir con gestos de scroll en algunos contextos
+        }}
+      />
+    ) : null;
+
+  const MenuLayer = portal
+    ? createPortal(
+        <>
+          {Backdrop}
+          {open && MenuPanel}
+        </>,
+        document.body
+      )
+    : open && MenuPanel;
+
   return (
     <div ref={rootRef} className={`relative ${className}`}>
       {label && <label className="block font-semibold mb-1">{label}</label>}
       {Button}
-      {open &&
-        !disabled &&
-        (portal ? createPortal(MenuInner, document.body) : MenuInner)}
+      {!disabled && MenuLayer}
     </div>
   );
 }

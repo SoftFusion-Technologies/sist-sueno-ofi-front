@@ -428,6 +428,8 @@ export default function ChequesCards() {
   return (
     <>
       <NavbarStaff />
+      <ScrollToTop></ScrollToTop>
+
       <section className="relative w-full min-h-screen bg-white">
         <div className="min-h-screen bg-gradient-to-b from-[#052e16] via-[#065f46] to-[#10b981]">
           <ParticlesBackground />

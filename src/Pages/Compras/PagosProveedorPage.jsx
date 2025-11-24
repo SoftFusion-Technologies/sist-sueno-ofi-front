@@ -1,0 +1,517 @@
+// ===========================================
+// FILE: src/Pages/Compras/PagosProveedorPage.jsx
+// ===========================================
+import React, { useEffect, useMemo, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import NavbarStaff from '../Dash/NavbarStaff';
+import ButtonBack from '../../Components/ButtonBack';
+import ParticlesBackground from '../../Components/ParticlesBackground';
+import http from '../../api/http';
+import { moneyAR } from '../../utils/money';
+import { Link } from 'react-router-dom';
+import {
+  FaPlus,
+  FaSyncAlt,
+  FaEye,
+  FaChevronLeft,
+  FaChevronRight,
+  FaFilter
+} from 'react-icons/fa';
+import classNames from 'classnames';
+
+import ProveedorPicker from '../../Components/Compras/Picker/ProveedorPicker';
+import PagoProveedorFormModal from '../../Components/Compras/PagoProveedorFormModal';
+import PagoProveedorDetailDrawer from '../../Components/Compras/Pagos/PagoProveedorDetailDrawer';
+
+const ESTADOS = [
+  { value: '', label: 'Todos' },
+  { value: 'borrador', label: 'Borrador' },
+  { value: 'confirmado', label: 'Confirmado' },
+  { value: 'anulado', label: 'Anulado' }
+];
+
+export default function PagosProveedorPage() {
+  // Filtros
+  const [q, setQ] = useState('');
+  const [provSel, setProvSel] = useState(null);
+  const [proveedorId, setProveedorId] = useState('');
+  const [estado, setEstado] = useState('');
+  const [desde, setDesde] = useState('');
+  const [hasta, setHasta] = useState('');
+
+  // Data
+  const [loading, setLoading] = useState(false);
+  const [rows, setRows] = useState([]);
+  const [meta, setMeta] = useState({ page: 1, pageSize: 12, total: 0 });
+  const { page, pageSize } = meta;
+  const [error, setError] = useState('');
+
+  // Modales / Drawer
+  const [openCreate, setOpenCreate] = useState(false);
+  const [openDetail, setOpenDetail] = useState(false);
+  const [detailId, setDetailId] = useState(null);
+
+  // proveedor picker loader
+  const loaderProveedores = async ({ q, page, pageSize }) => {
+    const { data } = await http.get('/proveedores', {
+      params: { q, page, pageSize }
+    });
+    return {
+      data: data?.data || [],
+      page: data?.page || page,
+      pageSize: data?.pageSize || pageSize,
+      total: data?.total || data?.data?.length || 0
+    };
+  };
+  // Fetch list
+  const fetchList = async (opts = {}) => {
+    try {
+      setLoading(true);
+      setError('');
+      const resp = await http.get('/pagos-proveedor', {
+        params: {
+          q,
+          proveedor_id: provSel?.id || proveedorId || undefined,
+          desde: desde || undefined,
+          hasta: hasta || undefined,
+          page: opts.page ?? page,
+          pageSize: opts.pageSize ?? pageSize
+        }
+      });
+      const data = resp?.data?.data || [];
+      const total = resp?.data?.meta?.total ?? data.length;
+      setRows(data);
+      setMeta((m) => ({
+        ...m,
+        page: opts.page ?? m.page,
+        pageSize: opts.pageSize ?? m.pageSize,
+        total
+      }));
+    } catch (e) {
+      setError(e?.mensajeError || 'No se pudo obtener la lista de pagos');
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchList({ page: 1 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, proveedorId, estado, desde, hasta, pageSize]);
+
+  const kpis = useMemo(() => {
+    let totalPagos = 0;
+    let totalAplicado = 0;
+    let totalDisponible = 0;
+
+    for (const r of rows) {
+      const total = Number(r?.monto_total_num ?? r?.monto_total ?? 0);
+      const aplicado = Number(r?.aplicado_total ?? r?.aplicado ?? 0);
+      const disponible =
+        r?.disponible != null
+          ? Number(r.disponible)
+          : Math.max(total - aplicado, 0);
+
+      totalPagos += total;
+      totalAplicado += aplicado;
+      totalDisponible += disponible;
+    }
+
+    return {
+      count: rows.length,
+      totalPagos,
+      totalAplicado,
+      totalDisponible
+    };
+  }, [rows]);
+
+  const openRowDetail = (id) => {
+    setDetailId(id);
+    setOpenDetail(true);
+  };
+
+  const clearFilters = () => {
+    setQ('');
+    setProvSel(null);
+    setProveedorId('');
+    setEstado('');
+    setDesde('');
+    setHasta('');
+    setMeta((m) => ({ ...m, page: 1 }));
+  };
+
+  return (
+    <>
+      <NavbarStaff />
+      <section className="relative w-full min-h-screen bg-white">
+        <div className="relative min-h-screen bg-gradient-to-b from-[#052e16] via-[#065f46] to-[#10b981]">
+          <ParticlesBackground />
+          <ButtonBack />
+
+          {/* Hero */}
+          <div className="text-center pt-24 px-4">
+            <motion.h1
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              className="text-4xl titulo uppercase font-bold text-white mb-3 drop-shadow-md"
+            >
+              Pagos a Proveedor
+            </motion.h1>
+            <p className="text-white/85">
+              Un pago, múltiples medios; aplicá a CxP y mantené saldos al día.
+            </p>
+          </div>
+
+          {/* Contenido */}
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 pt-6">
+            {/* KPIs */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[
+                { t: 'Pagos (página)', v: kpis.count },
+                { t: 'Total Pagado (página)', v: moneyAR(kpis.totalPagos) },
+                {
+                  t: 'Disponible (página)',
+                  v: moneyAR(kpis.totalDisponible)
+                }
+              ].map((k, i) => (
+                <div
+                  key={i}
+                  className="relative rounded-3xl p-[1px] bg-gradient-to-br from-emerald-400/70 via-teal-300/50 to-cyan-400/70"
+                >
+                  <div className="rounded-3xl bg-white/95 backdrop-blur-xl ring-1 ring-white/40 p-4">
+                    <div className="text-xs text-gray-500">{k.t}</div>
+                    <div className="text-2xl font-bold text-gray-900">
+                      {k.v}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Toolbar filtros + acciones */}
+            <div className="mt-6">
+              <div className="relative rounded-3xl p-[1px] bg-gradient-to-r from-emerald-400/60 via-teal-300/40 to-cyan-400/60 shadow-[0_1px_30px_rgba(16,185,129,0.15)]">
+                <div className="rounded-3xl bg-white/90 backdrop-blur-xl ring-1 ring-white/30 p-4 md:p-5">
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                    {/* búsqueda */}
+                    <div className="relative md:col-span-4">
+                      <input
+                        value={q}
+                        onChange={(e) => setQ(e.target.value)}
+                        placeholder="Buscar por observaciones, referencia o #pago…"
+                        className="w-full pl-3 pr-3 py-2.5 rounded-2xl border border-white/30 bg-white/90 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+
+                    {/* proveedor */}
+
+                    <ProveedorPicker
+                      value={provSel}
+                      onChange={(v) => {
+                        setProvSel(v);
+                        setProveedorId(v?.id ? String(v.id) : '');
+                      }}
+                      loader={loaderProveedores}
+                      className="md:col-span-3"
+                      placeholder="Proveedor (razón social o fantasía)…"
+                    />
+                    {/* estado */}
+                    <div className="md:col-span-2">
+                      <select
+                        value={estado}
+                        onChange={(e) => setEstado(e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-2xl border border-white/30 bg-white/90 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      >
+                        {ESTADOS.map((e) => (
+                          <option key={e.value || 'all'} value={e.value}>
+                            {e.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* fechas */}
+                    <input
+                      type="date"
+                      value={desde}
+                      onChange={(e) => setDesde(e.target.value)}
+                      className="md:col-span-1 w-full px-3 py-2.5 rounded-2xl border border-white/30 bg-white/90 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <input
+                      type="date"
+                      value={hasta}
+                      onChange={(e) => setHasta(e.target.value)}
+                      className="md:col-span-1 w-full px-3 py-2.5 rounded-2xl border border-white/30 bg-white/90 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+
+                    {/* acciones filtros */}
+                    <div className="md:col-span-2 flex gap-2">
+                      <button
+                        onClick={() => fetchList({ page: 1 })}
+                        className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl bg-emerald-600 text-white hover:bg-emerald-700 w-full"
+                      >
+                        <FaFilter /> Aplicar
+                      </button>
+                      <button
+                        onClick={clearFilters}
+                        className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 w-full"
+                      >
+                        <FaSyncAlt /> Limpiar
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Acciones rápidas */}
+                  <div className="mt-4 flex items-center justify-between">
+                    <div className="text-sm text-gray-600">
+                      {q || proveedorId || estado || desde || hasta ? (
+                        <span className="inline-block px-2 py-1 rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">
+                          Filtros activos
+                        </span>
+                      ) : (
+                        <span className="inline-block px-2 py-1 rounded-xl bg-gray-50 text-gray-600 ring-1 ring-gray-200">
+                          Sin filtros
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setOpenCreate(true)}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-white text-gray-900 font-semibold shadow-sm ring-1 ring-white/40 hover:shadow-md hover:-translate-y-0.5 transition"
+                      >
+                        <FaPlus /> Nuevo Pago
+                      </button>
+                      <button
+                        onClick={() => fetchList()}
+                        title="Refrescar"
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-2xl bg-white/90 text-gray-900 ring-1 ring-white/40 hover:shadow"
+                      >
+                        <FaSyncAlt /> Refrescar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Contenedor resultados */}
+            <div className="mt-6 relative rounded-3xl p-[1px] bg-gradient-to-br from-emerald-400/60 via-teal-300/40 to-cyan-400/60 shadow-[0_1px_30px_rgba(16,185,129,0.12)]">
+              <div className="rounded-3xl bg-white/95 backdrop-blur-xl ring-1 ring-white/40 p-2 sm:p-4">
+                {loading ? (
+                  <div className="p-6 text-gray-600">Cargando…</div>
+                ) : error ? (
+                  <div className="p-10 text-center text-rose-700 font-semibold">
+                    {error}
+                  </div>
+                ) : rows.length === 0 ? (
+                  <div className="p-10 text-center">
+                    <div className="text-gray-600">
+                      No se encontraron pagos.
+                    </div>
+                    <button
+                      onClick={() => setOpenCreate(true)}
+                      className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-emerald-600 text-white hover:bg-emerald-700"
+                    >
+                      <FaPlus /> Cargar primer pago
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-sm">
+                        <thead className="sticky top-0 z-10">
+                          <tr>
+                            <th
+                              colSpan={9}
+                              className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 bg-gradient-to-r from-white/95 to-white/70 backdrop-blur border-b border-gray-100"
+                            >
+                              Resultados · {meta.total} pagos
+                            </th>
+                          </tr>
+                          <tr className="text-left text-gray-600 bg-white/95 backdrop-blur border-b border-gray-100">
+                            <th className="px-3 py-2">#</th>
+                            <th className="px-3 py-2">Fecha</th>
+                            <th className="px-3 py-2">Proveedor</th>
+                            <th className="px-3 py-2 text-right">Total</th>
+                            <th className="px-3 py-2 text-right">Aplicado</th>
+                            <th className="px-3 py-2 text-right">Disponible</th>
+                            <th className="px-3 py-2">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <AnimatePresence initial={false}>
+                            {rows.map((r) => {
+                              // Tomamos los campos ya calculados por el back,
+                              // y hacemos fallback a lo viejo por si hay datos previos
+                              const total = Number(
+                                r?.monto_total_num ?? r?.monto_total ?? 0
+                              );
+                              const aplicado = Number(r?.aplicado_total ?? 0);
+                              const disponible = Number(
+                                r?.disponible ?? Math.max(total - aplicado, 0)
+                              );
+
+                              return (
+                                <motion.tr
+                                  key={r.id}
+                                  layout
+                                  initial={{ opacity: 0, y: 6 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  exit={{ opacity: 0, y: -6 }}
+                                  className={classNames(
+                                    'border-t border-gray-100 hover:bg-gray-50/70 transition'
+                                  )}
+                                >
+                                  <td className="px-3 py-2 font-mono text-gray-800">
+                                    {r.id}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    {r?.fecha
+                                      ? new Date(r.fecha).toLocaleDateString(
+                                          'es-AR'
+                                        )
+                                      : '—'}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <div className="font-medium text-gray-900">
+                                      {r?.proveedor?.razon_social ||
+                                        `Proveedor #${r.proveedor_id}`}
+                                    </div>
+                                    {r?.proveedor?.cuit && (
+                                      <div className="text-xs text-gray-500">
+                                        CUIT: {r.proveedor.cuit}
+                                      </div>
+                                    )}
+                                  </td>
+                                  <td className="px-3 py-2 text-right font-semibold">
+                                    {moneyAR(
+                                      r.monto_total_num ?? r.monto_total
+                                    )}
+                                  </td>
+                                  <td className="px-3 py-2 text-right">
+                                    {moneyAR(
+                                      r.aplicado_total ?? r.aplicado ?? 0
+                                    )}
+                                  </td>
+                                  <td className="px-3 py-2 text-right">
+                                    {moneyAR(
+                                      r.disponible ??
+                                        Math.max(
+                                          (r.monto_total_num ??
+                                            r.monto_total ??
+                                            0) -
+                                            (r.aplicado_total ??
+                                              r.aplicado ??
+                                              0),
+                                          0
+                                        )
+                                    )}
+                                  </td>
+
+                                  <td className="px-3 py-2">
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        onClick={() => openRowDetail(r.id)}
+                                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-gray-200 text-gray-700 hover:bg-gray-50"
+                                      >
+                                        <FaEye /> Ver
+                                      </button>
+                                    </div>
+                                  </td>
+                                </motion.tr>
+                              );
+                            })}
+                          </AnimatePresence>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Paginación */}
+                    <div className="mt-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                      <div className="text-xs text-gray-600">
+                        Página {page} de{' '}
+                        {Math.max(1, Math.ceil((meta.total || 0) / pageSize))} ·{' '}
+                        {meta.total} resultados
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={pageSize}
+                          onChange={(e) =>
+                            setMeta((m) => ({
+                              ...m,
+                              page: 1,
+                              pageSize: Number(e.target.value)
+                            }))
+                          }
+                          className="px-2 py-1.5 rounded-xl border border-gray-200 bg-white text-sm"
+                        >
+                          {[10, 12, 20, 30, 50].map((n) => (
+                            <option key={n} value={n}>
+                              {n} / página
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          disabled={page <= 1}
+                          onClick={() =>
+                            setMeta((m) => ({
+                              ...m,
+                              page: Math.max(1, m.page - 1)
+                            }))
+                          }
+                          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border disabled:opacity-40"
+                        >
+                          <FaChevronLeft /> Anterior
+                        </button>
+                        <button
+                          disabled={
+                            page >=
+                            Math.max(1, Math.ceil((meta.total || 0) / pageSize))
+                          }
+                          onClick={() =>
+                            setMeta((m) => ({
+                              ...m,
+                              page: Math.min(
+                                Math.max(
+                                  1,
+                                  Math.ceil((meta.total || 0) / m.pageSize)
+                                ),
+                                m.page + 1
+                              )
+                            }))
+                          }
+                          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border disabled:opacity-40"
+                        >
+                          Siguiente <FaChevronRight />
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Modales/Drawer */}
+          <PagoProveedorFormModal
+            open={openCreate}
+            onClose={() => setOpenCreate(false)}
+            onCreated={() => {
+              setOpenCreate(false);
+            }}
+            fetchList={fetchList}
+          />
+
+          <PagoProveedorDetailDrawer
+            open={openDetail}
+            onClose={() => setOpenDetail(false)}
+            id={detailId}
+            onChanged={() => fetchList()}
+          />
+        </div>
+      </section>
+    </>
+  );
+}

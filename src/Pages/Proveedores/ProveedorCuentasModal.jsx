@@ -288,6 +288,7 @@ export default function ProveedorCuentasModal({
   const handleSave = async () => {
     const v = validate();
     if (v) return setError(v);
+
     setSaving(true);
     setError('');
 
@@ -305,13 +306,29 @@ export default function ProveedorCuentasModal({
         }
       );
 
-      if (!res.ok) throw new Error('No se pudo guardar la cuenta');
+      // Intentamos leer el JSON siempre
+      let data = null;
+      try {
+        data = await res.json();
+      } catch {
+        data = null; // por si viene vacío
+      }
 
+      if (!res.ok) {
+        const msg =
+          data?.mensajeError ||
+          data?.message ||
+          'No se pudo guardar la cuenta bancaria.';
+        throw new Error(msg);
+      }
+
+      // OK
       await fetchList();
       if (!editId) setForm(emptyForm);
       setEditId(null);
     } catch (e) {
-      setError(e.message || 'Error guardando');
+      console.error('Error en handleSave cuentas:', e);
+      setError(e.message || 'Error guardando cuenta bancaria');
     } finally {
       setSaving(false);
     }

@@ -25,10 +25,12 @@ import {
   Tags,
   Clock,
   Banknote,
-  BarChart3
+  BarChart3,
+  Receipt
 } from 'lucide-react';
 import ProveedorChequesModal from './ProveedorChequesModal';
 import ProveedorChequesKPIModal from './Components/ProveedorChequesKPIModal';
+import ProveedorPagosModal from './ProveedorPagosModal'; // nuevo modal - luego del modulo de compras, registramos los pagos realizados a proveedores
 
 const cleanCUIT = (v) => (typeof v === 'string' ? v.replace(/\D+/g, '') : v);
 
@@ -364,11 +366,18 @@ export default function ProveedoresManager() {
   };
 
   const [chequesKPIsOpen, setChequesKPIsOpen] = useState(false);
+  const [pagosOpen, setPagosOpen] = useState(false); //  nuevo
 
   // handlers (ya tenías navigate, pero aquí estilo modal)
   const abrirChequesResumen = () => {
     if (!proveedorSel?.id) return;
     setChequesKPIsOpen(true);
+  };
+
+  const abrirPagosProveedorModal = () => {
+    if (!proveedorSel?.id) return;
+    setPickerOpen(false);
+    setPagosOpen(true);
   };
 
   const totalPages = Math.max(
@@ -1073,6 +1082,25 @@ export default function ProveedoresManager() {
                       </div>
                     </button>
 
+                    {/* ➕ Nuevo: Pagos realizados */}
+                    <button
+                      onClick={abrirPagosProveedorModal}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition p-4 text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500/40 active:scale-[.99]"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-white/5 grid place-items-center border border-white/10">
+                          <Receipt size={18} />
+                        </div>
+                        <div>
+                          <div className="text-gray-100 font-medium">
+                            Pagos realizados
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            Ver pagos a este proveedor
+                          </div>
+                        </div>
+                      </div>
+                    </button>
                     {/* ➕ Nuevo: KPIs de cheques */}
                     <button
                       onClick={abrirChequesResumen}
@@ -1140,6 +1168,13 @@ export default function ProveedoresManager() {
         onClose={() => setChequesKPIsOpen(false)}
         proveedorId={proveedorSel.id}
         proveedorNombre={proveedorSel.nombre}
+        userId={userId}
+      />
+      <ProveedorPagosModal
+        open={pagosOpen}
+        onClose={() => setPagosOpen(false)}
+        proveedorId={proveedorSel?.id}
+        proveedorNombre={proveedorSel?.nombre}
         userId={userId}
       />
     </>

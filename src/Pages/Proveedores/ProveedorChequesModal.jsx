@@ -373,7 +373,7 @@ export default function ProveedorChequesModal({
                               </span>
                             </td>
                             <td className="px-4 py-3 text-gray-100">
-                              {r.banco?.nombre || '—'}
+                              {r.banco_nombre || '—'}
                             </td>
                             <td className="px-4 py-3 font-semibold text-emerald-300">
                               {fmtMoney(r.monto)}

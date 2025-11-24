@@ -36,11 +36,17 @@ const LogsSistema = () => {
     'cerrar',
     'actualizar',
     'cambiar_estado',
-    'predeterminada'
+    'predeterminada',
+    'confirmar',
+    'anular',
+    'aplicar',
+    'desaplicar'
   ];
 
   const modulos = [
     'usuarios',
+    'compras',
+    'cuentas_pagar_proveedores',
     'ventas',
     'caja',
     'clientes',
@@ -53,7 +59,9 @@ const LogsSistema = () => {
     'banco_cuentas',
     'banco_movimientos',
     'chequeras',
-    'cheques'
+    'cheques',
+    'teso_flujo',
+    'pagos_proveedor'
   ];
 
   const [paginaActual, setPaginaActual] = useState(1);

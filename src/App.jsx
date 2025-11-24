@@ -79,12 +79,22 @@ import ChequeImagesManager from './Components/Cheques/ChequeImagesManager';
 import AdminPageTesoreria from './Pages/Tesoreria/AdminPageTesoreria';
 import TesoFlujoPage from './Pages/Tesoreria/TesoFlujoPage';
 import AdminPageCaja from './Pages/Ventas/AdminPageCaja';
+import AdminPageCompras from './Pages/Compras/AdminPageCompras';
+import { CompraDetalle, CompraForm, ComprasListado } from './Pages/Compras';
+import Footer from './Components/Footer';
+import CxpManager from './Pages/Compras/CxpManager';
+import PagosProveedorPage from './Pages/Compras/PagosProveedorPage';
+import ComprasImpuestosPage from './Pages/Compras/ComprasImpuestosPage';
+import ImpuestosConfigPage from './Pages/Compras/ImpuestosConfigPage';
+import ScrollToTop from './Components/ScrollToTop';
 
 function AppContent() {
   const { hideLayoutFooter, hideLayoutNav } = useLayoutVisibility();
 
   return (
     <>
+      <ScrollToTop></ScrollToTop>
+
       <div className="w-full min-h-screen overflow-x-hidden bg-[#1f3636]">
         {/* {!hideLayoutNav && <NavBar />} */}
         <Rutas>
@@ -534,12 +544,78 @@ function AppContent() {
             }
           />
           {/* MODULO DENTRO DE TESORERIA FINAL BENJAMIN ORELLANA 28 09 25 */}{' '}
+          {/* MODULO DENTRO DE COMPRAS INICIO BENJAMIN ORELLANA 03 11 25 */}
+          <Ruta
+            path="/dashboard/compras"
+            element={
+              <ProtectedRoute>
+                {' '}
+                <AdminPageCompras />{' '}
+              </ProtectedRoute>
+            }
+          />
+          <Ruta
+            path="/dashboard/compras/listado"
+            element={
+              <ProtectedRoute>
+                {' '}
+                <ComprasListado />{' '}
+              </ProtectedRoute>
+            }
+          />
+          <Ruta
+            path="/dashboard/compras/:id"
+            element={
+              <ProtectedRoute>
+                {' '}
+                <CompraDetalle />{' '}
+              </ProtectedRoute>
+            }
+          />
+          <Ruta
+            path="/dashboard/compras/cxp"
+            element={
+              <ProtectedRoute>
+                {' '}
+                <CxpManager />{' '}
+              </ProtectedRoute>
+            }
+          />
+          <Ruta
+            path="/dashboard/compras/pagos"
+            element={
+              <ProtectedRoute>
+                {' '}
+                <PagosProveedorPage />{' '}
+              </ProtectedRoute>
+            }
+          />
+          <Ruta
+            path="/dashboard/compras/impuestos"
+            element={
+              <ProtectedRoute>
+                {' '}
+                <ComprasImpuestosPage />{' '}
+              </ProtectedRoute>
+            }
+          />
+          <Ruta
+            path="/dashboard/compras/impuestos-config"
+            element={
+              <ProtectedRoute>
+                {' '}
+                <ImpuestosConfigPage />{' '}
+              </ProtectedRoute>
+            }
+          />
+          {/* MODULO DENTRO DE COMPRAS FINAL  BENJAMIN ORELLANA 03 11 25 */}
           {/* componentes del staff y login FINAL */}
           {/* <Ruta path="/*" element={<NotFound />} /> */}
           {/* 🔁 Ruta no encontrada */}
           <Ruta path="*" element={<Navigate to="/login" replace />} />
         </Rutas>
         {/* {!hideLayoutFooter && <Footer />} */}
+        <Footer></Footer>
       </div>
     </>
   );

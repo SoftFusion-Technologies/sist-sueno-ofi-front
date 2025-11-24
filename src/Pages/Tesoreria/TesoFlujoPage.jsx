@@ -281,6 +281,7 @@ export default function TesoFlujoPage() {
                   >
                     <option value="">Todos</option>
                     <option value="cheque">Cheque</option>
+                    <option value="compra">Compra</option>
                     <option value="transferencia">Transferencia</option>
                     <option value="efectivo">Efectivo</option>
                     <option value="otro">Otro</option>
@@ -391,7 +392,12 @@ export default function TesoFlujoPage() {
                     )}
                     {rows.map((r) => (
                       <tr key={r.id} className="border-t hover:bg-gray-50/80">
-                        <td className="px-4 py-2">{r.fecha}</td>
+                        <td className="px-4 py-2">
+                          {r?.fecha
+                            ? new Date(r.fecha).toLocaleDateString('es-AR')
+                            : '—'}
+                        </td>
+
                         <td className="px-4 py-2">
                           <span
                             className={`px-2 py-0.5 rounded-full text-xs ${

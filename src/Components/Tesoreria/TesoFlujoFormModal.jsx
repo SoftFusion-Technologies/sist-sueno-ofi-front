@@ -151,6 +151,7 @@ export default function TesoFlujoFormModal({
                     className="w-full rounded-xl border px-3 py-2"
                   >
                     <option value="cheque">Cheque</option>
+                    <option value="compra">Compra</option>
                     <option value="transferencia">Transferencia</option>
                     <option value="efectivo">Efectivo</option>
                     <option value="otro">Otro</option>

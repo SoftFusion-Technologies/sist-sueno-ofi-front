@@ -19,6 +19,8 @@ import AjustePreciosModal from './Components/AjustePreciosModal.jsx';
 import { useAuth } from '../../AuthContext.jsx';
 import { getUserId } from '../../utils/authUtils';
 import ProductoSetupWizard from './Components/ProductoSetupWizard.jsx';
+import Swal from 'sweetalert2';
+import 'sweetalert2/dist/sweetalert2.min.css';
 
 Modal.setAppElement('#root');
 const BASE_URL = 'http://localhost:8080';
@@ -292,14 +294,30 @@ const ProductosGet = () => {
     e.preventDefault();
 
     const parsedPrecio = parseFloat(formValues.precio);
-    if (isNaN(parsedPrecio) || parsedPrecio < 0) {
-      alert('Por favor ingrese un precio válido');
+    if (Number.isNaN(parsedPrecio) || parsedPrecio < 0) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Precio inválido',
+        text: 'Por favor ingresá un precio válido (mayor o igual a 0).'
+      });
       return;
     }
 
     const uid = getUserId?.() ?? null;
 
     try {
+      // Loader mientras guarda
+      Swal.fire({
+        title: editId ? 'Actualizando producto…' : 'Creando producto…',
+        text: 'Guardando cambios en el sistema',
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        showConfirmButton: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
       const dataToSend = {
         ...formValues,
         precio: parsedPrecio.toFixed(2),
@@ -307,31 +325,56 @@ const ProductosGet = () => {
         proveedor_preferido_id: proveedorIdSel ? Number(proveedorIdSel) : null
       };
 
+      // === EDITAR PRODUCTO ===
       if (editId) {
         await axios.put(`${BASE_URL}/productos/${editId}`, dataToSend, {
           headers: { 'X-User-Id': String(uid ?? '') }
         });
+
         fetchData?.();
         setModalOpen(false);
-        return; // 👈 no abrimos wizard en editar
-      }
 
-      // CREAR PRODUCTO
-      const resp = await axios.post(`${BASE_URL}/productos`, dataToSend, {
-        headers: { 'X-User-Id': String(uid ?? '') }
-      });
-      const nuevoProducto = resp?.data?.producto;
-      if (!nuevoProducto?.id)
-        throw new Error('No se recibió el ID del producto creado');
+        Swal.close();
+        Swal.fire({
+          icon: 'success',
+          title: 'Producto actualizado',
+          text: 'Los cambios se guardaron correctamente.',
+          timer: 1700,
+          showConfirmButton: false
+        });
 
-      // Si NO hay proveedor seleccionado ⇒ listo (no abrimos wizard)
-      if (!proveedorIdSel) {
-        fetchData?.();
-        setModalOpen(false);
+        // no abrimos wizard en editar
         return;
       }
 
-      // Si HAY proveedor ⇒ crear relación y abrir wizard
+      // === CREAR PRODUCTO ===
+      const resp = await axios.post(`${BASE_URL}/productos`, dataToSend, {
+        headers: { 'X-User-Id': String(uid ?? '') }
+      });
+
+      const nuevoProducto = resp?.data?.producto;
+      if (!nuevoProducto?.id) {
+        throw new Error('No se recibió el ID del producto creado');
+      }
+
+      // Si NO hay proveedor seleccionado ⇒ solo guardamos producto
+      if (!proveedorIdSel) {
+        fetchData?.();
+        setModalOpen(false);
+
+        Swal.close();
+        Swal.fire({
+          icon: 'success',
+          title: 'Producto creado',
+          text: 'El producto se guardó correctamente.',
+          timer: 1700,
+          showConfirmButton: false
+        });
+
+        return;
+      }
+
+      // Si HAY proveedor ⇒ crear relación producto_proveedor
       const payloadPP = {
         producto_id: Number(nuevoProducto.id),
         proveedor_id: Number(proveedorIdSel),
@@ -347,10 +390,8 @@ const ProductosGet = () => {
         vigente: true,
         observaciones: 'Alta automática al crear producto',
         usuario_log_id: uid,
-
-        // 👇 NUEVO: pedimos NO crear historial inicial
+        // 👇 NO crear historial inicial
         registrar_historial_inicial: false
-        // y SIN "motivo", para no triggerear el default del backend
       };
 
       let creadoPpId = null;
@@ -366,15 +407,26 @@ const ProductosGet = () => {
         creadoPpId = creado?.id ?? null;
       } catch (e) {
         console.warn('[producto-proveedor] no crítico:', e?.message || e);
+        // si falla esto no rompemos el flujo principal
       }
 
-      // cerrar modal de crear y refrescar
+      // cerrar modal + refrescar
       fetchData?.();
       setModalOpen(false);
 
-      // abrir wizard SOLO si tenés proveedor
+      Swal.close();
+      Swal.fire({
+        icon: 'success',
+        title: 'Producto creado',
+        text: 'Ahora podés completar los datos del proveedor.',
+        timer: 1900,
+        showConfirmButton: false
+      });
+
+      // Abrir wizard de relación producto-proveedor
       const proveedorObj =
         proveedores.find((p) => p.id === Number(proveedorIdSel)) || null;
+
       setSetupData({
         producto: nuevoProducto,
         proveedor: proveedorObj,
@@ -383,9 +435,15 @@ const ProductosGet = () => {
       setSetupOpen(true);
     } catch (err) {
       console.error('Error al guardar producto:', err);
-      alert(
-        err?.response?.data?.mensajeError || err.message || 'Error al guardar'
-      );
+      Swal.close();
+      Swal.fire({
+        icon: 'error',
+        title: 'Error al guardar',
+        text:
+          err?.response?.data?.mensajeError ||
+          err.message ||
+          'Ocurrió un error al guardar el producto.'
+      });
     }
   };
 
@@ -1015,7 +1073,20 @@ const ProductosGet = () => {
                     setDeleteMeta(null);
                     fetchData();
                   } catch (error) {
-                    console.error('Error al eliminar con forzado:', error);
+                    console.error(
+                      'Error al eliminar con forzado:',
+                      error.response?.data || error
+                    );
+
+                    // 👉 Si el segundo DELETE devuelve 409, solo mostramos el mensaje
+                    if (error.response?.status === 409) {
+                      const data = error.response.data || {};
+                      setWarningMessage(
+                        data.mensajeError || 'No se pudo eliminar el producto.'
+                      );
+                      setDeleteMeta(data); // ej: reason = 'FK_REF' o 'LOCK_TIMEOUT'
+                      // NO cerramos el modal ni tocamos confirmDelete
+                    }
                   }
                 }}
                 className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white"
@@ -1040,8 +1111,18 @@ const ProductosGet = () => {
                   } catch (error) {
                     console.error(
                       'Error al eliminar producto (forzado por proveedor):',
-                      error
+                      error.response?.data || error
                     );
+
+                    // 👉 Si el segundo DELETE devuelve 409, mostramos mensaje y NO borramos
+                    if (error.response?.status === 409) {
+                      const data = error.response.data || {};
+                      setWarningMessage(
+                        data.mensajeError || 'No se pudo eliminar el producto.'
+                      );
+                      setDeleteMeta(data); // ej: reason = 'FK_REF', 'FK_COMPRAS', etc.
+                      // NO cerramos el modal, para que lea el mensaje
+                    }
                   }
                 }}
                 className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white"
@@ -1075,6 +1156,20 @@ const ProductosGet = () => {
                 Entendido
               </button>
             )}
+
+            {/* Casos genéricos de FK/lock (no queremos seguir borrando) */}
+            {['FK_REF', 'LOCK_TIMEOUT'].includes(deleteMeta?.reason) && (
+              <button
+                onClick={() => {
+                  setConfirmDelete(null);
+                  setDeleteMeta(null);
+                }}
+                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white"
+              >
+                Entendido
+              </button>
+            )}
+            {console.clear()}
           </div>
         </Modal>
       </div>
@@ -1083,7 +1178,7 @@ const ProductosGet = () => {
         onClose={() => setShowAjustePrecios(false)}
         onSuccess={() => fetchData()} // refrescar productos
       />
-      <ProductoSetupWizard
+      {/* <ProductoSetupWizard
         open={setupOpen}
         onClose={() => setSetupOpen(false)}
         producto={setupData.producto}
@@ -1092,7 +1187,7 @@ const ProductosGet = () => {
         uid={userId}
         BASE_URL={BASE_URL}
         onRefresh={fetchData}
-      />
+      /> */}
     </div>
   );
 };
