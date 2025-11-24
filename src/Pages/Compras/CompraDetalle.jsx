@@ -274,7 +274,7 @@ export default function CompraDetalle() {
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === 'b') navigate(-1);
-      if (row?.estado === 'borrador' && e.key === 'c') confirmar();
+      // if (row?.estado === 'borrador' && e.key === 'c') confirmar();
       if (row?.estado === 'confirmada' && e.key === 'x') anular();
     };
     window.addEventListener('keydown', onKey);

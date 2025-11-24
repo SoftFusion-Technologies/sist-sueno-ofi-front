@@ -87,6 +87,7 @@ import PagosProveedorPage from './Pages/Compras/PagosProveedorPage';
 import ComprasImpuestosPage from './Pages/Compras/ComprasImpuestosPage';
 import ImpuestosConfigPage from './Pages/Compras/ImpuestosConfigPage';
 import ScrollToTop from './Components/ScrollToTop';
+import OrdenesCompraListado from './Pages/Compras/OrdenesCompraListado';
 
 function AppContent() {
   const { hideLayoutFooter, hideLayoutNav } = useLayoutVisibility();
@@ -596,6 +597,15 @@ function AppContent() {
               <ProtectedRoute>
                 {' '}
                 <ComprasImpuestosPage />{' '}
+              </ProtectedRoute>
+            }
+          />
+          <Ruta
+            path="/dashboard/compras/ordenes"
+            element={
+              <ProtectedRoute>
+                {' '}
+                <OrdenesCompraListado />{' '}
               </ProtectedRoute>
             }
           />

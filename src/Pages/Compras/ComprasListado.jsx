@@ -1,5 +1,5 @@
 // ===============================
-// FILE: src/Pages/Compras/ComprasListado.jsx (v3 ultra-moderno++ glass • gradient • microinteracciones)
+// FILE: src/Pages/Compras/ComprasListado.jsx
 // ===============================
 import React, {
   useCallback,
@@ -757,7 +757,7 @@ export default function ComprasListado() {
                                 colSpan={10}
                                 className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 bg-gradient-to-r from-white/95 to-white/70 backdrop-blur border-b border-gray-100"
                               >
-                                Resultados · {meta.total} compras
+                                Resultados · {kpis.count} compras
                               </th>
                             </tr>
                             <tr className="text-left text-gray-600 bg-white/95 backdrop-blur border-b border-gray-100">
@@ -968,8 +968,8 @@ export default function ComprasListado() {
                     <div className="mt-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
                       <div className="text-xs text-gray-600">
                         Página {page} de{' '}
-                        {Math.max(1, Math.ceil((meta.total || 0) / pageSize))} ·{' '}
-                        {meta.total} resultados
+                        {Math.max(1, Math.ceil((kpis.count || 0) / pageSize))} ·{' '}
+                        {kpis.count} resultados
                       </div>
                       <div className="flex items-center gap-2">
                         <select
