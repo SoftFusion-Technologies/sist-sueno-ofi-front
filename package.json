@@ -37,7 +37,8 @@
     "react-toastify": "^11.0.5",
     "react-tsparticles": "^2.12.2",
     "recharts": "^2.15.4",
-    "sweetalert2": "^11.23.0",
+    "sweetalert2": "^11.26.3",
+    "sweetalert2-react-content": "^5.1.0",
     "toastify": "^2.0.1",
     "xlsx": "^0.18.5",
     "yup": "^1.6.1"
