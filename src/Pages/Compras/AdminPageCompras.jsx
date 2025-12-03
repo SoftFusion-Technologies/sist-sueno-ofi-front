@@ -87,18 +87,6 @@ const links = [
     icon: <FaUndoAlt />
   },
   {
-    to: '/dashboard/compras/notas-credito',
-    label: 'Notas de Crédito',
-    sub: 'Ajustes y referencias',
-    icon: <FaFileInvoice />
-  },
-  {
-    to: '/dashboard/compras/stock-movimientos',
-    label: 'Libro Mayor de Stock',
-    sub: 'COMPRA/VENTA/etc',
-    icon: <FaBook />
-  },
-  {
     to: '/dashboard/compras/impuestos-config',
     label: 'Config. Impuestos',
     sub: 'Catálogo de alícuotas',
@@ -109,12 +97,6 @@ const links = [
     label: 'Adjuntos',
     sub: 'PDF/Remitos/Comprob.',
     icon: <FaCloudUploadAlt />
-  },
-  {
-    to: '/dashboard/compras/mapeo-contable',
-    label: 'Mapeo Contable',
-    sub: 'Cuentas por rubro',
-    icon: <FaSitemap />
   }
 ];
 

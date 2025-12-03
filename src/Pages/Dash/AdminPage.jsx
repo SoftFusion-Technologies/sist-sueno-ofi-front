@@ -108,7 +108,7 @@ const AdminPage = () => {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5 }}
-                  className="text-2xl sm:text-3xl lg:text-4xl titulo uppercase tracking-[.18em] uppercase text-white"
+                  className="text-2xl sm:text-3xl lg:text-4xl titulo tracking-[.18em] uppercase text-white"
                 >
                   Panel principal
                 </motion.h1>
