@@ -264,7 +264,7 @@ const ProductosGet = () => {
         estado: producto.estado || 'activo'
       });
 
-      // 👇 si viene el preferido en el producto, lo mostramos en el select
+      //  si viene el preferido en el producto, lo mostramos en el select
       setProveedorIdSel(
         producto.proveedor_preferido_id ||
           producto.proveedor_preferido?.id ||
@@ -390,7 +390,7 @@ const ProductosGet = () => {
         vigente: true,
         observaciones: 'Alta automática al crear producto',
         usuario_log_id: uid,
-        // 👇 NO crear historial inicial
+        //  NO crear historial inicial
         registrar_historial_inicial: false
       };
 
@@ -461,6 +461,76 @@ const ProductosGet = () => {
       } else {
         console.error('Error al eliminar producto:', err);
       }
+    }
+  };
+
+  // Benjamin Orellana 07-12-2025 22:46:12
+  // Se agrega nueva funcionalidad para duplicar un producto existente
+  const handleDuplicarProducto = async (producto) => {
+    const uid = getUserId?.() ?? userId ?? null;
+
+    const result = await Swal.fire({
+      title: '¿Duplicar producto?',
+      html: `Se va a crear una copia de:<br/><b>${producto.nombre}</b>`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, duplicar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#22c55e',
+      cancelButtonColor: '#6b7280'
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      Swal.fire({
+        title: 'Duplicando producto…',
+        text: 'Por favor esperá un momento',
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        showConfirmButton: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
+      const resp = await axios.post(
+        `${BASE_URL}/productos/${producto.id}/duplicar`,
+        { usuario_log_id: uid },
+        {
+          headers: {
+            'X-User-Id': String(uid ?? '')
+          }
+        }
+      );
+
+      const nuevo = resp?.data?.producto;
+
+      await fetchData();
+
+      // cerramos el loader
+      Swal.close();
+
+      await Swal.fire({
+        icon: 'success',
+        title: 'Producto duplicado',
+        html: nuevo
+          ? `Se creó <b>${nuevo.nombre}</b> (ID: ${nuevo.id}).<br/>Si necesitás ajustar algo, usá el botón <b>Editar</b>.`
+          : 'La copia se creó correctamente.',
+        timer: 2500,
+        showConfirmButton: false
+      });
+    } catch (error) {
+      console.error('Error al duplicar producto:', error);
+      Swal.close();
+      Swal.fire({
+        icon: 'error',
+        title: 'Error al duplicar',
+        text:
+          error?.response?.data?.mensajeError ||
+          error.message ||
+          'Ocurrió un error al duplicar el producto.'
+      });
     }
   };
 
@@ -725,123 +795,184 @@ const ProductosGet = () => {
             <motion.div
               key={p.id}
               layout
-              className="bg-white/10 p-6 rounded-2xl shadow-xl backdrop-blur-md border border-white/10 hover:scale-[1.02] transition-all"
+              className="bg-white/10 p-4 md:p-5 rounded-2xl shadow-xl backdrop-blur-md border border-white/10 hover:scale-[1.015] hover:border-rose-400/60 transition-all flex flex-col justify-between"
             >
-              <h2 className="text-xl font-bold text-white mb-1">ID: {p.id}</h2>
-              <h2 className="text-xl font-bold text-rose-300 mb-1">
-                {p.nombre}
-              </h2>
+              {/* HEADER: ID + Nombre + Estado */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <span className="text-[0.7rem] uppercase tracking-wide text-gray-300/70">
+                    ID #{p.id}
+                  </span>
+                  <h2 className="mt-1 text-lg font-semibold text-rose-300 leading-snug truncate">
+                    {p.nombre}
+                  </h2>
+                </div>
 
-              <p className="text-sm text-gray-200 mb-1">
-                <span className="font-semibold text-white">Descripción:</span>{' '}
-                {p.descripcion || 'Sin descripción'}
-              </p>
-
-              <p className="text-sm text-gray-200 mb-1">
-                <span className="font-semibold text-white">Marca:</span>{' '}
-                {p.marca || 'Sin marca'}
-              </p>
-
-              <p className="text-sm text-gray-200 mb-1">
-                <span className="font-semibold text-white">Modelo:</span>{' '}
-                {p.modelo || 'Sin modelo'}
-              </p>
-
-              <p className="text-sm text-gray-200 mb-1">
-                <span className="font-semibold text-white">Medida:</span>{' '}
-                {p.medida || 'Sin medida'}
-              </p>
-
-              <p className="text-sm text-gray-200 mb-1">
-                <span className="font-semibold text-white">SKU:</span>{' '}
-                {p.codigo_sku || 'No asignado'}
-              </p>
-
-              <p className="text-sm text-gray-400 mb-1">
-                <span className="font-semibold text-white">Categoría:</span>{' '}
-                {p.categoria?.nombre || 'Sin categoría'}
-              </p>
-
-              {/* Proveedor preferido */}
-              {(() => {
-                const provName =
-                  p.proveedor_preferido?.razon_social ?? // si el backend incluye el objeto
-                  (p.proveedor_preferido_id
-                    ? proveedoresMap[p.proveedor_preferido_id]
-                    : null); // si solo viene el id
-
-                return (
-                  <p className="text-sm text-gray-200 mb-1">
-                    <span className="font-semibold text-white">Proveedor:</span>{' '}
-                    {provName ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white/10 text-emerald-300 border border-emerald-900/40">
-                        {provName}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">—</span>
-                    )}
-                  </p>
-                );
-              })()}
-
-              <div className="flex items-center gap-3 mt-2">
-                {/* Precio original */}
                 <span
-                  className={
-                    p.descuento_porcentaje > 0
-                      ? 'text-gray-400 line-through text-sm'
-                      : 'text-green-300 font-semibold'
-                  }
+                  className={`px-2 py-1 rounded-full text-[0.65rem] font-semibold uppercase tracking-wide ${
+                    p.estado === 'activo'
+                      ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-400/40'
+                      : 'bg-red-500/15 text-red-300 border border-red-400/40'
+                  }`}
                 >
-                  {new Intl.NumberFormat('es-AR', {
-                    style: 'currency',
-                    currency: 'ARS',
-                    minimumFractionDigits: 2
-                  }).format(p.precio || 0)}
+                  {p.estado}
                 </span>
+              </div>
 
-                {/* Precio con descuento */}
-                {p.descuento_porcentaje > 0 && (
-                  <>
-                    <span className="text-green-400 font-bold text-lg drop-shadow">
+              {/* META: Marca / Modelo / Medida / Categoría / Proveedor / SKU */}
+              <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-gray-200">
+                {/* Columna izquierda */}
+                <div className="space-y-1">
+                  <div>
+                    <div className="text-[0.65rem] uppercase tracking-wide text-gray-400">
+                      Marca
+                    </div>
+                    <div className="truncate text-gray-100">
+                      {p.marca || 'Sin marca'}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-[0.65rem] uppercase tracking-wide text-gray-400">
+                      Modelo
+                    </div>
+                    <div className="truncate text-gray-100">
+                      {p.modelo || 'Sin modelo'}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-[0.65rem] uppercase tracking-wide text-gray-400">
+                      Medida
+                    </div>
+                    <div className="truncate text-gray-100">
+                      {p.medida || 'Sin medida'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Columna derecha */}
+                <div className="space-y-1">
+                  <div>
+                    <div className="text-[0.65rem] uppercase tracking-wide text-gray-400">
+                      Categoría
+                    </div>
+                    <div className="truncate text-gray-100">
+                      {p.categoria?.nombre || 'Sin categoría'}
+                    </div>
+                  </div>
+
+                  {/* Proveedor preferido */}
+                  {(() => {
+                    const provName =
+                      p.proveedor_preferido?.razon_social ??
+                      (p.proveedor_preferido_id
+                        ? proveedoresMap[p.proveedor_preferido_id]
+                        : null);
+
+                    return (
+                      <div>
+                        <div className="text-[0.65rem] uppercase tracking-wide text-gray-400">
+                          Proveedor
+                        </div>
+                        <div className="truncate">
+                          {provName ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/10 text-emerald-300 border border-emerald-900/40 text-[0.7rem]">
+                              {provName}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  <div>
+                    <div className="text-[0.65rem] uppercase tracking-wide text-gray-400">
+                      SKU
+                    </div>
+                    <div className="truncate text-gray-100">
+                      {p.codigo_sku || 'No asignado'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* DESCRIPCIÓN (compacta) */}
+              {p.descripcion && (
+                <p className="mt-3 text-xs text-gray-300/90 line-clamp-3">
+                  {p.descripcion}
+                </p>
+              )}
+
+              {/* PRECIOS */}
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <div className="flex items-baseline gap-2">
+                  {/* Precio original */}
+                  <span
+                    className={
+                      p.descuento_porcentaje > 0
+                        ? 'text-gray-400 line-through text-xs'
+                        : 'text-green-300 font-semibold text-sm'
+                    }
+                  >
+                    {new Intl.NumberFormat('es-AR', {
+                      style: 'currency',
+                      currency: 'ARS',
+                      minimumFractionDigits: 2
+                    }).format(p.precio || 0)}
+                  </span>
+
+                  {/* Precio con descuento */}
+                  {p.descuento_porcentaje > 0 && (
+                    <span className="text-green-400 font-bold text-sm drop-shadow">
                       {new Intl.NumberFormat('es-AR', {
                         style: 'currency',
                         currency: 'ARS',
                         minimumFractionDigits: 2
                       }).format(p.precio_con_descuento)}
                     </span>
-                    <span className="bg-rose-100 text-rose-500 rounded px-2 py-1 text-xs font-bold ml-1">
-                      -{p.descuento_porcentaje}% OFF
-                    </span>
-                  </>
+                  )}
+                </div>
+
+                {p.descuento_porcentaje > 0 && (
+                  <span className="bg-rose-100/90 text-rose-600 rounded-full px-2 py-0.5 text-[0.7rem] font-bold">
+                    -{p.descuento_porcentaje}% OFF
+                  </span>
                 )}
               </div>
 
-              <p
-                className={`mt-2 uppercase text-sm font-semibold ${
-                  p.estado === 'activo' ? 'text-green-400' : 'text-red-400'
-                }`}
-              >
-                {p.estado}
-              </p>
+              {/* FOOTER: fecha + acciones */}
+              <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between gap-2">
+                <p className="text-[0.7rem] text-gray-400">
+                  Creado el{' '}
+                  {new Date(p.created_at).toLocaleDateString('es-AR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                  })}
+                </p>
 
-              <p className="text-sm text-gray-400 mt-1">
-                Creado el:{' '}
-                {new Date(p.created_at).toLocaleString('es-AR', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit',
-                  hour12: false
-                })}
-              </p>
+                <div className="flex items-center gap-2">
+                  {/* Botón duplicar a la izquierda */}
+                  <button
+                    type="button"
+                    onClick={() => handleDuplicarProducto(p)}
+                    className="inline-flex items-center px-3 py-1.5 rounded-lg bg-emerald-600/90 hover:bg-emerald-500 text-[0.7rem] font-semibold text-white shadow-sm transition"
+                    title="Duplicar producto"
+                  >
+                    <span className="mr-1">⧉</span>
+                    Duplicar
+                  </button>
 
-              <AdminActions
-                onEdit={() => openModal(p)}
-                onDelete={() => handleDelete(p.id)}
-              />
+                  {/* Botones globales (Editar / Eliminar) a la derecha */}
+                  <AdminActions
+                    onEdit={() => openModal(p)}
+                    onDelete={() => handleDelete(p.id)}
+                  />
+                </div>
+              </div>
             </motion.div>
           ))}
         </div>
@@ -1078,7 +1209,7 @@ const ProductosGet = () => {
                       error.response?.data || error
                     );
 
-                    // 👉 Si el segundo DELETE devuelve 409, solo mostramos el mensaje
+                    //  Si el segundo DELETE devuelve 409, solo mostramos el mensaje
                     if (error.response?.status === 409) {
                       const data = error.response.data || {};
                       setWarningMessage(
@@ -1114,7 +1245,7 @@ const ProductosGet = () => {
                       error.response?.data || error
                     );
 
-                    // 👉 Si el segundo DELETE devuelve 409, mostramos mensaje y NO borramos
+                    //  Si el segundo DELETE devuelve 409, mostramos mensaje y NO borramos
                     if (error.response?.status === 409) {
                       const data = error.response.data || {};
                       setWarningMessage(
@@ -1169,7 +1300,6 @@ const ProductosGet = () => {
                 Entendido
               </button>
             )}
-            {console.clear()}
           </div>
         </Modal>
       </div>
