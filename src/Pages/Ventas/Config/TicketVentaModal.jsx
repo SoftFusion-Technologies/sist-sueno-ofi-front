@@ -130,19 +130,78 @@ function numeroALetras(num) {
 
 /* ------------------------------------------------------ */
 
-export default function TicketVentaModal({ venta, onClose, mostrarValorTicket }) {
+export default function TicketVentaModal({
+  venta,
+  onClose,
+  mostrarValorTicket
+}) {
   const ref = useRef();
   const navigate = useNavigate();
   const [config, setConfig] = useState(null);
+  const [localInfo, setLocalInfo] = useState(null);
 
+  // Configuración de ticket según el local de la venta
   useEffect(() => {
-    axios
-      .get('http://localhost:8080/ticket-config')
-      .then((res) => setConfig(res.data))
-      .catch(() => setConfig(null));
-  }, []);
+    if (!venta) return;
+
+    // 1) Sacamos el local_id de la venta
+    //    - primero campo plano local_id
+    //    - si no, del include (venta.local / venta.locale)
+    const localId =
+      venta.local_id || venta.local?.id || venta.locale?.id || null;
+
+    if (!localId) {
+      console.warn('Venta sin local_id / local embebido');
+      setConfig(null);
+      setLocalInfo(null);
+      return;
+    }
+
+    const fetchConfigByLocal = async () => {
+      try {
+        const { data } = await axios.get(
+          `http://localhost:8080/ticket-config/by-local/${localId}`
+        );
+        // El backend devuelve: { local: {...}, ticketConfig: {...} }
+        setConfig(data.ticketConfig || null);
+        setLocalInfo(data.local || null);
+      } catch (err) {
+        console.error(
+          'Error al obtener configuración de ticket por local:',
+          err
+        );
+        setConfig(null);
+        setLocalInfo(null);
+      }
+    };
+
+    fetchConfigByLocal();
+  }, [venta]);
 
   if (!venta) return null;
+
+  // Datos combinados: primero ticket, luego local
+  const nombreTienda =
+    config?.nombre_tienda ||
+    localInfo?.nombre ||
+    venta.locale?.nombre ||
+    venta.local?.nombre ||
+    '';
+
+  const direccion = config?.direccion || localInfo?.direccion || '';
+
+  const telefono = config?.telefono || localInfo?.telefono || '';
+
+  const email = config?.email || localInfo?.email || '';
+
+  const apiBase = 'http://localhost:8080';
+
+  // Armamos URL completa del logo
+  const logoUrl = config?.logo_path
+    ? config.logo_path.startsWith('http')
+      ? config.logo_path
+      : `${apiBase}${config.logo_path}`
+    : null;
 
   const detalles = Array.isArray(venta.detalles) ? venta.detalles : [];
   const descuentos = Array.isArray(venta.descuentos) ? venta.descuentos : [];
@@ -356,22 +415,25 @@ export default function TicketVentaModal({ venta, onClose, mostrarValorTicket })
               TICKET SIMPLE
             </div>
 
-            {config?.logo_url && (
+            {/* Logo desde logo_path */}
+            {logoUrl && (
               <img
-                src={config.logo_url}
+                src={logoUrl}
                 alt="Logo"
                 className="mx-auto mb-2 max-h-16 object-contain rounded shadow"
                 style={{ maxWidth: 120 }}
               />
             )}
 
+            {/* Nombre tienda (ticket > local) */}
             <div
               className="font-extrabold text-2xl tracking-widest mb-1 uppercase"
               style={{ color: '#6d28d9', letterSpacing: 2 }}
             >
-              {config?.nombre_tienda || ''}
+              {nombreTienda}
             </div>
 
+            {/* Lema solo si está en el ticket */}
             {config?.lema && (
               <div
                 className="text-xs font-bold tracking-widest mb-1"
@@ -381,16 +443,16 @@ export default function TicketVentaModal({ venta, onClose, mostrarValorTicket })
               </div>
             )}
 
-            {(config?.direccion || config?.telefono) && (
+            {/* Dirección + Teléfono: ticket > local */}
+            {(direccion || telefono) && (
               <div className="text-xs text-gray-600 dark:text-gray-300 font-medium mb-1">
-                {config?.direccion}
-                {config?.telefono && <span> • {config.telefono}</span>}
+                {direccion}
+                {telefono && <span> • {telefono}</span>}
               </div>
             )}
 
-            {config?.email && (
-              <div className="text-xs text-gray-500">{config.email}</div>
-            )}
+            {/* Email: ticket > local */}
+            {email && <div className="text-xs text-gray-500">{email}</div>}
           </div>
 
           {/* Info Venta */}

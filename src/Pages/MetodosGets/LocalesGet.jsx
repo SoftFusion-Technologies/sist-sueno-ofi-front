@@ -1,7 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { motion } from 'framer-motion';
-import { FaPlus, FaEdit, FaTrash, FaSearchLocation } from 'react-icons/fa';
+import {
+  FaPlus,
+  FaEdit,
+  FaTrash,
+  FaSearchLocation,
+  FaMapMarkerAlt,
+  FaPhoneAlt,
+  FaEnvelope,
+  FaStore,
+  FaClock,
+  FaFileInvoice
+} from 'react-icons/fa';
 import Modal from 'react-modal';
 import ParticlesBackground from '../../Components/ParticlesBackground';
 import ButtonBack from '../../Components/ButtonBack';
@@ -10,6 +21,7 @@ import { getUserId } from '../../utils/authUtils';
 Modal.setAppElement('#root');
 
 const API = 'http://localhost:8080/locales';
+const TICKET_API = 'http://localhost:8080/ticket-config';
 
 const defaultFormValues = {
   nombre: '',
@@ -24,7 +36,8 @@ const defaultFormValues = {
   horario_apertura: '09:00',
   horario_cierre: '18:00',
   printer_nombre: '',
-  estado: 'activo'
+  estado: 'activo',
+  ticket_config_id: '' // 👈 nuevo campo en el form
 };
 
 const LocalesGet = () => {
@@ -44,6 +57,10 @@ const LocalesGet = () => {
   const usuarioId = getUserId();
 
   const debouncedQ = useMemo(() => search.trim(), [search]);
+
+  // 👇 ticket configs para el selector
+  const [ticketConfigs, setTicketConfigs] = useState([]);
+  const [loadingTickets, setLoadingTickets] = useState(false);
 
   const fetchLocales = async () => {
     setLoading(true);
@@ -67,13 +84,30 @@ const LocalesGet = () => {
     }
   };
 
+  const fetchTicketConfigs = async () => {
+    setLoadingTickets(true);
+    try {
+      const res = await axios.get(TICKET_API);
+      const list = Array.isArray(res.data) ? res.data : res.data.data || [];
+      setTicketConfigs(list);
+    } catch (e) {
+      console.error('Error al obtener ticket config:', e);
+    } finally {
+      setLoadingTickets(false);
+    }
+  };
+
   useEffect(() => {
     fetchLocales();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, limit, orderBy, orderDir, debouncedQ]);
 
+  // Ticket configs solo una vez
+  useEffect(() => {
+    fetchTicketConfigs();
+  }, []);
+
   const filteredWhenNoMeta = useMemo(() => {
-    // Si NO hay meta (array plano por compat), mantené tu filtrado local
     if (meta) return data;
     const q = search.toLowerCase();
     return data.filter((l) =>
@@ -86,7 +120,11 @@ const LocalesGet = () => {
   const openModal = (local = null) => {
     if (local) {
       setEditId(local.id);
-      setFormValues({ ...defaultFormValues, ...local });
+      setFormValues({
+        ...defaultFormValues,
+        ...local,
+        ticket_config_id: local.ticket_config_id ?? ''
+      });
     } else {
       setEditId(null);
       setFormValues(defaultFormValues);
@@ -105,7 +143,15 @@ const LocalesGet = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const payload = { ...formValues, usuario_log_id: usuarioId };
+
+    const payload = {
+      ...formValues,
+      ticket_config_id: formValues.ticket_config_id
+        ? Number(formValues.ticket_config_id)
+        : null,
+      usuario_log_id: usuarioId
+    };
+
     if (editId) {
       await axios.put(`${API}/${editId}`, payload);
     } else {
@@ -127,34 +173,51 @@ const LocalesGet = () => {
   const hasPrev = meta?.hasPrev ?? currPage > 1;
   const hasNext = meta?.hasNext ?? currPage < totalPages;
 
-  // Datos que se muestran (server-side si hay meta, client-side si no hay)
   const rows = meta
     ? data
     : filteredWhenNoMeta.slice((page - 1) * limit, page * limit);
 
+  const getTicketLabel = (local) => {
+    if (!local.ticket_config_id) return 'Sin plantilla asignada';
+    const t = ticketConfigs.find(
+      (cfg) => Number(cfg.id) === Number(local.ticket_config_id)
+    );
+    if (!t) return `Plantilla #${local.ticket_config_id}`;
+    // podés cambiar el texto si luego agregás un campo nombre_config
+    return t.nombre_tienda || `Plantilla #${t.id}`;
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0c0e24] via-[#0f112b] to-[#131538] py-10 px-6 text-white relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 py-10 px-6 text-white relative overflow-hidden">
       <ButtonBack />
       <ParticlesBackground />
-      <div className="max-w-6xl mx-auto z-10 relative">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl titulo uppercase font-extrabold text-pink-400 flex items-center gap-3 drop-shadow-lg">
-            <FaSearchLocation className="animate-pulse" /> Locales
-          </h1>
+      <div className="max-w-6xl mx-auto z-10 relative space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between gap-4 items-start sm:items-center">
+          <div>
+            <h1 className="text-3xl sm:text-4xl titulo uppercase font-extrabold text-emerald-300 flex items-center gap-3 drop-shadow-lg">
+              <FaSearchLocation className="animate-pulse" /> Locales & Tickets
+            </h1>
+            <p className="text-sm text-emerald-100/80 mt-1">
+              Gestioná tus sucursales y asigná la plantilla de ticket que
+              corresponde a cada una.
+            </p>
+          </div>
           <button
             onClick={() => openModal()}
-            className="bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 transition-colors px-5 py-2 rounded-xl font-bold shadow-md flex items-center gap-2"
+            className="bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 transition-all px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-emerald-500/30 flex items-center gap-2 text-sm"
           >
             <FaPlus /> Nuevo Local
           </button>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        {/* Filtros superiores */}
+        <div className="flex flex-col sm:flex-row gap-3 mb-2">
           <div className="flex items-center gap-2">
             <select
               value={orderBy}
               onChange={(e) => setOrderBy(e.target.value)}
-              className="px-3 py-2 rounded-lg bg-gray-900 border border-gray-700"
+              className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-sm"
               aria-label="Ordenar por"
             >
               <option value="id">ID</option>
@@ -162,13 +225,11 @@ const LocalesGet = () => {
               <option value="codigo">Código</option>
               <option value="ciudad">Ciudad</option>
               <option value="provincia">Provincia</option>
-              {/* <option value="created_at">Creación</option>
-              <option value="updated_at">Actualización</option> */}
             </select>
             <select
               value={orderDir}
               onChange={(e) => setOrderDir(e.target.value)}
-              className="px-3 py-2 rounded-lg bg-gray-900 border border-gray-700"
+              className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-sm"
               aria-label="Dirección de orden"
             >
               <option value="ASC">Ascendente</option>
@@ -180,7 +241,7 @@ const LocalesGet = () => {
                 setLimit(Number(e.target.value));
                 setPage(1);
               }}
-              className="px-3 py-2 rounded-lg bg-gray-900 border border-gray-700"
+              className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-sm"
               aria-label="Items por página"
             >
               <option value={6}>6</option>
@@ -192,13 +253,13 @@ const LocalesGet = () => {
 
           <input
             type="text"
-            placeholder="Buscar local..."
+            placeholder="Buscar por nombre, dirección o teléfono..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
               setPage(1);
             }}
-            className="flex-1 px-4 py-3 rounded-xl border border-gray-700 bg-gray-900 text-white focus:outline-none focus:ring-2 focus:ring-pink-500 placeholder:text-gray-400"
+            className="flex-1 px-4 py-3 rounded-xl border border-slate-700 bg-slate-950 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 placeholder:text-slate-400"
           />
         </div>
 
@@ -210,16 +271,16 @@ const LocalesGet = () => {
           </div>
           <div className="-mx-2 sm:mx-0">
             <div className="overflow-x-auto no-scrollbar px-2 sm:px-0">
-              <div className="inline-flex items-center whitespace-nowrap gap-2">
+              <div className="inline-flex items-center whitespace-nowrap gap-2 text-sm">
                 <button
-                  className="px-3 py-2 rounded-lg bg-gray-700 text-white disabled:opacity-40"
+                  className="px-3 py-2 rounded-lg bg-slate-800 text-white disabled:opacity-40"
                   onClick={() => setPage(1)}
                   disabled={!hasPrev}
                 >
                   «
                 </button>
                 <button
-                  className="px-3 py-2 rounded-lg bg-gray-700 text-white disabled:opacity-40"
+                  className="px-3 py-2 rounded-lg bg-slate-800 text-white disabled:opacity-40"
                   onClick={() => setPage((p) => Math.max(p - 1, 1))}
                   disabled={!hasPrev}
                 >
@@ -241,10 +302,10 @@ const LocalesGet = () => {
                         <button
                           key={num}
                           onClick={() => setPage(num)}
-                          className={`px-3 py-2 rounded-lg border ${
+                          className={`px-3 py-2 rounded-lg border text-sm ${
                             active
-                              ? 'bg-pink-600 border-pink-400'
-                              : 'bg-gray-800 border-gray-700 hover:bg-gray-700'
+                              ? 'bg-emerald-600 border-emerald-400'
+                              : 'bg-slate-900 border-slate-700 hover:bg-slate-800'
                           }`}
                           aria-current={active ? 'page' : undefined}
                         >
@@ -255,14 +316,14 @@ const LocalesGet = () => {
                 </div>
 
                 <button
-                  className="px-3 py-2 rounded-lg bg-gray-700 text-white disabled:opacity-40"
+                  className="px-3 py-2 rounded-lg bg-slate-800 text-white disabled:opacity-40"
                   onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
                   disabled={!hasNext}
                 >
                   ›
                 </button>
                 <button
-                  className="px-3 py-2 rounded-lg bg-gray-700 text-white disabled:opacity-40"
+                  className="px-3 py-2 rounded-lg bg-slate-800 text-white disabled:opacity-40"
                   onClick={() => setPage(totalPages)}
                   disabled={!hasNext}
                 >
@@ -273,8 +334,11 @@ const LocalesGet = () => {
           </div>
         </div>
 
-        {/* Grid */}
-        <motion.div layout className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Grid de locales */}
+        <motion.div
+          layout
+          className="grid grid-cols-1 md:grid-cols-2 gap-5 lg:gap-6"
+        >
           {loading
             ? Array.from({ length: Math.min(limit, 8) }).map((_, i) => (
                 <div
@@ -282,59 +346,146 @@ const LocalesGet = () => {
                   className="h-40 rounded-2xl bg-white/5 border border-white/10 animate-pulse"
                 />
               ))
-            : rows.map((local) => (
-                <motion.div
-                  key={local.id}
-                  layout
-                  className="bg-white/10 p-6 rounded-2xl shadow-xl backdrop-blur-lg border border-white/10 hover:scale-[1.02] transition-transform"
-                >
-                  <h2 className="text-xl font-bold text-white">
-                    ID: {local.id}
-                  </h2>
-                  <h2 className="text-xl font-bold text-pink-300">
-                    {local.nombre}
-                  </h2>
-                  <p className="text-sm text-gray-400 italic">
-                    {local.direccion}
-                  </p>
-                  <p className="text-sm text-gray-400">
-                    📍 {local.ciudad}, {local.provincia}
-                  </p>
-                  <p className="text-sm text-gray-400">📞 {local.telefono}</p>
-                  <p className="text-sm text-gray-400">
-                    Responsable: {local.responsable_nombre} (
-                    {local.responsable_dni})
-                  </p>
-                  <p className="text-sm text-gray-400">
-                    🕒 {local.horario_apertura} - {local.horario_cierre}
-                  </p>
-                  <p className="text-sm text-gray-400">
-                    🖨️ {local.printer_nombre}
-                  </p>
-                  <p className="text-sm text-gray-400">✉️ {local.email}</p>
-                  <p className="text-sm text-green-400 font-bold">
-                    Estado: {local.estado}
-                  </p>
+            : rows.map((local) => {
+                const ticketLabel = getTicketLabel(local);
+                const activo = local.estado === 'activo';
 
-                  <div className="mt-4 flex justify-end gap-4">
-                    <button
-                      onClick={() => openModal(local)}
-                      className="text-yellow-400 hover:text-yellow-300 text-xl"
-                    >
-                      <FaEdit />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(local.id)}
-                      className="text-red-500 hover:text-red-400 text-xl"
-                    >
-                      <FaTrash />
-                    </button>
-                  </div>
-                </motion.div>
-              ))}
+                return (
+                  <motion.div
+                    key={local.id}
+                    layout
+                    whileHover={{ y: -4, scale: 1.01 }}
+                    transition={{ type: 'spring', stiffness: 200, damping: 18 }}
+                    className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-white/5 via-slate-900/60 to-emerald-900/40 shadow-xl"
+                  >
+                    {/* Halo */}
+                    <div className="pointer-events-none absolute -top-16 -right-16 w-40 h-40 bg-emerald-500/20 rounded-full blur-3xl" />
+
+                    <div className="p-5 space-y-3 relative">
+                      {/* Header */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-2 text-xs text-slate-300 mb-1">
+                            <span className="px-2 py-0.5 rounded-full bg-slate-800/80 border border-slate-600/60 flex items-center gap-1">
+                              <FaStore className="text-emerald-300" />
+                              <span>Local #{local.id}</span>
+                            </span>
+                            {local.codigo && (
+                              <span className="px-2 py-0.5 rounded-full bg-slate-800/80 border border-slate-600/60">
+                                Cod: {local.codigo}
+                              </span>
+                            )}
+                          </div>
+                          <h2 className="text-lg font-bold text-white tracking-wide">
+                            {local.nombre}
+                          </h2>
+                        </div>
+                        <span
+                          className={`px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1 ${
+                            activo
+                              ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-400/40'
+                              : 'bg-rose-500/15 text-rose-300 border border-rose-400/40'
+                          }`}
+                        >
+                          <span
+                            className={`w-2 h-2 rounded-full ${
+                              activo ? 'bg-emerald-400' : 'bg-rose-400'
+                            }`}
+                          />
+                          {local.estado.toUpperCase()}
+                        </span>
+                      </div>
+
+                      {/* Info principal */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-slate-200">
+                        <div className="space-y-1.5">
+                          <div className="flex items-start gap-2">
+                            <FaMapMarkerAlt className="mt-0.5 text-emerald-300" />
+                            <div>
+                              <p className="font-medium">
+                                {local.direccion || 'Sin dirección'}
+                              </p>
+                              <p className="text-xs text-slate-400">
+                                {local.ciudad || 'Ciudad no definida'}
+                                {local.provincia && ` · ${local.provincia}`}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <FaClock className="text-emerald-300" />
+                            <p className="text-xs">
+                              {local.horario_apertura} - {local.horario_cierre}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <FaPhoneAlt className="text-emerald-300" />
+                            <p className="text-xs">
+                              {local.telefono || 'Sin teléfono'}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <FaEnvelope className="text-emerald-300" />
+                            <p className="text-xs truncate">
+                              {local.email || 'Sin email'}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <FaFileInvoice className="text-emerald-300" />
+                            <p className="text-xs">
+                              <span className="font-semibold">Ticket: </span>
+                              {ticketLabel}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Responsable / impresora */}
+                      <div className="flex flex-wrap gap-2 text-[11px] text-slate-300 mt-1.5">
+                        {local.responsable_nombre && (
+                          <span className="px-2 py-1 rounded-full bg-slate-900/80 border border-slate-700 flex items-center gap-1">
+                            👤 {local.responsable_nombre}
+                            {local.responsable_dni && (
+                              <span className="text-slate-400">
+                                · DNI {local.responsable_dni}
+                              </span>
+                            )}
+                          </span>
+                        )}
+                        {local.printer_nombre && (
+                          <span className="px-2 py-1 rounded-full bg-slate-900/80 border border-slate-700">
+                            🖨️ {local.printer_nombre}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Acciones */}
+                      <div className="mt-4 flex justify-end gap-2">
+                        <button
+                          onClick={() => openModal(local)}
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-400/40 hover:bg-amber-400/20 flex items-center gap-1"
+                        >
+                          <FaEdit />
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleDelete(local.id)}
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/15 text-rose-300 border border-rose-400/40 hover:bg-rose-400/20 flex items-center gap-1"
+                        >
+                          <FaTrash />
+                          Eliminar
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
         </motion.div>
 
-        {/* Paginador inferior (igual al superior) */}
+        {/* Paginador inferior */}
         <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="text-white/80 text-xs sm:text-sm">
             Total: <b>{total}</b> · Página <b>{currPage}</b> de{' '}
@@ -342,16 +493,16 @@ const LocalesGet = () => {
           </div>
           <div className="-mx-2 sm:mx-0">
             <div className="overflow-x-auto no-scrollbar px-2 sm:px-0">
-              <div className="inline-flex items-center whitespace-nowrap gap-2">
+              <div className="inline-flex items-center whitespace-nowrap gap-2 text-sm">
                 <button
-                  className="px-3 py-2 rounded-lg bg-gray-700 text-white disabled:opacity-40"
+                  className="px-3 py-2 rounded-lg bg-slate-800 text-white disabled:opacity-40"
                   onClick={() => setPage(1)}
                   disabled={!hasPrev}
                 >
                   «
                 </button>
                 <button
-                  className="px-3 py-2 rounded-lg bg-gray-700 text-white disabled:opacity-40"
+                  className="px-3 py-2 rounded-lg bg-slate-800 text-white disabled:opacity-40"
                   onClick={() => setPage((p) => Math.max(p - 1, 1))}
                   disabled={!hasPrev}
                 >
@@ -372,10 +523,10 @@ const LocalesGet = () => {
                         <button
                           key={num}
                           onClick={() => setPage(num)}
-                          className={`px-3 py-2 rounded-lg border ${
+                          className={`px-3 py-2 rounded-lg border text-sm ${
                             active
-                              ? 'bg-pink-600 border-pink-400'
-                              : 'bg-gray-800 border-gray-700 hover:bg-gray-700'
+                              ? 'bg-emerald-600 border-emerald-400'
+                              : 'bg-slate-900 border-slate-700 hover:bg-slate-800'
                           }`}
                         >
                           {num}
@@ -384,14 +535,14 @@ const LocalesGet = () => {
                     })}
                 </div>
                 <button
-                  className="px-3 py-2 rounded-lg bg-gray-700 text-white disabled:opacity-40"
+                  className="px-3 py-2 rounded-lg bg-slate-800 text-white disabled:opacity-40"
                   onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
                   disabled={!hasNext}
                 >
                   ›
                 </button>
                 <button
-                  className="px-3 py-2 rounded-lg bg-gray-700 text-white disabled:opacity-40"
+                  className="px-3 py-2 rounded-lg bg-slate-800 text-white disabled:opacity-40"
                   onClick={() => setPage(totalPages)}
                   disabled={!hasNext}
                 >
@@ -406,12 +557,16 @@ const LocalesGet = () => {
         <Modal
           isOpen={modalOpen}
           onRequestClose={() => setModalOpen(false)}
-          overlayClassName="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50"
-          className="bg-white rounded-2xl p-6 max-w-2xl w-full mx-4 shadow-2xl border-l-4 border-pink-500 overflow-y-auto max-h-[90vh] scrollbar-thin scrollbar-thumb-pink-300"
+          overlayClassName="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-50"
+          className="bg-white rounded-2xl p-6 max-w-3xl w-full mx-4 shadow-2xl border border-slate-200 overflow-y-auto max-h-[90vh] scrollbar-thin scrollbar-thumb-emerald-300"
         >
-          <h2 className="text-2xl font-bold mb-4 text-pink-600">
+          <h2 className="text-2xl font-bold mb-1 text-slate-900 flex items-center gap-2">
             {editId ? 'Editar Local' : 'Nuevo Local'}
           </h2>
+          <p className="text-xs text-slate-500 mb-4">
+            Completa los datos del local y asigná una plantilla de ticket si
+            corresponde.
+          </p>
 
           <form
             onSubmit={handleSubmit}
@@ -424,15 +579,15 @@ const LocalesGet = () => {
 
               if (key === 'estado') {
                 return (
-                  <div key={key} className="md:col-span-2">
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  <div key={key} className="md:col-span-1">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
                       {label}
                     </label>
                     <select
                       name={key}
                       value={formValues[key]}
                       onChange={handleChange}
-                      className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-pink-400"
+                      className="w-full px-4 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                     >
                       <option value="activo">Activo</option>
                       <option value="inactivo">Inactivo</option>
@@ -441,9 +596,42 @@ const LocalesGet = () => {
                 );
               }
 
+              if (key === 'ticket_config_id') {
+                return (
+                  <div key={key} className="md:col-span-2">
+                    <label className=" text-xs font-semibold text-slate-700 mb-1 flex items-center gap-2">
+                      Plantilla de ticket
+                      <span className="text-[10px] font-normal text-slate-400">
+                        (opcional, podés reutilizar la misma en varios locales)
+                      </span>
+                    </label>
+                    <select
+                      name={key}
+                      value={formValues[key]}
+                      onChange={handleChange}
+                      disabled={loadingTickets}
+                      className="w-full px-4 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white disabled:bg-slate-100"
+                    >
+                      <option value="">
+                        {loadingTickets
+                          ? 'Cargando plantillas...'
+                          : 'Sin plantilla asignada'}
+                      </option>
+                      {ticketConfigs.map((cfg) => (
+                        <option key={cfg.id} value={cfg.id}>
+                          {cfg.nombre_tienda
+                            ? `${cfg.nombre_tienda} (ID ${cfg.id})`
+                            : `Plantilla #${cfg.id}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              }
+
               return (
                 <div key={key} className="w-full">
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     {label}
                   </label>
                   <input
@@ -458,15 +646,23 @@ const LocalesGet = () => {
                     value={formValues[key]}
                     onChange={handleChange}
                     placeholder={label}
-                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-pink-400"
+                    className="w-full px-4 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                   />
                 </div>
               );
             })}
-            <div className="md:col-span-2 text-right mt-4">
+
+            <div className="md:col-span-2 flex justify-end gap-2 mt-2">
+              <button
+                type="button"
+                onClick={() => setModalOpen(false)}
+                className="px-5 py-2 rounded-lg text-sm font-semibold border border-slate-300 text-slate-700 hover:bg-slate-100"
+              >
+                Cancelar
+              </button>
               <button
                 type="submit"
-                className="bg-pink-500 hover:bg-pink-600 transition px-6 py-2 text-white font-semibold rounded-lg shadow-md"
+                className="bg-emerald-500 hover:bg-emerald-600 transition px-6 py-2 text-white text-sm font-semibold rounded-lg shadow-md"
               >
                 {editId ? 'Actualizar' : 'Guardar'}
               </button>
