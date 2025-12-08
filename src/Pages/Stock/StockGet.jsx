@@ -31,6 +31,7 @@ import Barcode from 'react-barcode';
 import { getUserId } from '../../utils/authUtils';
 import SearchableSelect from './Components/SearchableSelect.jsx';
 import LocalesCantidadPicker from './Components/LocalesCantidadPicker.jsx';
+import ModalAlertasStockBajo from './Components/ModalAlertasStockBajo.jsx';
 
 Modal.setAppElement('#root');
 
@@ -161,6 +162,8 @@ const StockGet = () => {
   const [localId, setLocalId] = useState('');
   const [lugarId, setLugarId] = useState('');
   const [estadoId, setEstadoId] = useState('');
+
+  const [showAlertasStock, setShowAlertasStock] = useState(true);
 
   // para “debounce” lógico de búsqueda
   const debouncedQ = useMemo(() => q.trim(), [q]);
@@ -1112,69 +1115,148 @@ const StockGet = () => {
               <motion.div
                 key={group.key}
                 layout
-                className="bg-white/10 p-6 rounded-2xl shadow-md border border-white/10 hover:scale-[1.02]"
+                className="bg-white/10 p-4 md:p-5 rounded-2xl shadow-xl backdrop-blur-md border border-white/10 hover:scale-[1.015] hover:border-cyan-400/60 transition-all flex flex-col justify-between"
               >
-                <h2 className="text-xl font-bold text-cyan-300 mb-1 uppercase">
-                  {producto?.nombre}
-                </h2>
-                <p className="text-sm">ID PRODUCTO: {producto?.id}</p>
-                <p className="text-sm">Local: {local?.nombre}</p>
-                {otrosLocalesConStock.length > 0 && (
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                    <span className="text-white/70">También en:</span>
-                    {otrosLocalesConStock.map((l) => (
-                      <span
-                        key={l.id}
-                        className="px-2 py-1 rounded-full bg-white/10 border border-white/10"
-                      >
-                        {l.nombre}
-                      </span>
-                    ))}
+                {/* HEADER: Nombre producto + local + estado stock */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-sm font-semibold text-cyan-300 uppercase tracking-wide truncate">
+                      {producto?.nombre || 'Producto sin nombre'}
+                    </h2>
+                    <p className="mt-1 text-[0.7rem] text-gray-300/80">
+                      ID #{producto?.id ?? '—'}
+                    </p>
                   </div>
-                )}
-                <p className="text-sm">Lugar: {lugar?.nombre || 'Sin lugar'}</p>
-                <p className="text-sm">
-                  Estado: {estado?.nombre || 'Sin Estado'}
-                </p>
-                <p className="text-sm flex items-center gap-2">
-                  <span
-                    className={
-                      cantidadTotal <= THRESHOLD
-                        ? 'text-red-400'
-                        : 'text-green-300'
-                    }
-                  >
-                    Cantidad total: {cantidadTotal}
-                  </span>
-                  {cantidadTotal <= THRESHOLD && (
-                    <span className="flex items-center text-red-500 font-bold text-xs animate-pulse">
-                      <FaExclamationTriangle className="mr-1" />
-                      ¡Stock bajo!
-                    </span>
-                  )}
-                </p>
-                <p className="text-sm flex items-center gap-2">
-                  En exhibición:
-                  {group.en_exhibicion ? (
-                    <span className="text-green-400 flex items-center gap-1">
-                      <FaCheckCircle /> Sí
-                    </span>
-                  ) : (
-                    <span className="text-red-400 flex items-center gap-1">
-                      <FaTimesCircle /> No
-                    </span>
-                  )}
-                </p>
-                <p className="text-sm mt-2 text-white/90">
-                  SKU:{' '}
-                  <span className="font-mono">
-                    {group.items[0]?.codigo_sku || '—'}
-                  </span>
-                </p>
 
-                <div className="flex gap-2">
+                  <div className="flex flex-col items-end gap-1">
+                    {local && (
+                      <span className="px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-400/40 text-[0.65rem] text-cyan-200 font-semibold uppercase tracking-wide">
+                        {local.nombre}
+                      </span>
+                    )}
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[0.65rem] font-semibold uppercase tracking-wide ${
+                        cantidadTotal <= THRESHOLD
+                          ? 'bg-red-500/15 text-red-300 border border-red-400/40'
+                          : 'bg-emerald-500/15 text-emerald-300 border border-emerald-400/40'
+                      }`}
+                    >
+                      {cantidadTotal <= THRESHOLD ? 'Stock bajo' : 'Stock OK'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* META: Lugar / Estado / En exhibición / Otros locales */}
+                <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-gray-100">
+                  {/* Columna izquierda */}
+                  <div className="space-y-1">
+                    <div>
+                      <div className="text-[0.65rem] uppercase tracking-wide text-gray-400">
+                        Lugar
+                      </div>
+                      <div className="truncate">
+                        {lugar?.nombre || 'Sin lugar asignado'}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[0.65rem] uppercase tracking-wide text-gray-400">
+                        Estado
+                      </div>
+                      <div className="truncate">
+                        {estado?.nombre || 'Sin estado'}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[0.65rem] uppercase tracking-wide text-gray-400">
+                        En exhibición
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {group.en_exhibicion ? (
+                          <span className="text-emerald-300 inline-flex items-center gap-1">
+                            <FaCheckCircle className="text-emerald-400" />
+                            Sí
+                          </span>
+                        ) : (
+                          <span className="text-red-300 inline-flex items-center gap-1">
+                            <FaTimesCircle className="text-red-400" />
+                            No
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Columna derecha */}
+                  <div className="space-y-1">
+                    <div>
+                      <div className="text-[0.65rem] uppercase tracking-wide text-gray-400">
+                        Cantidad total
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={
+                            cantidadTotal <= THRESHOLD
+                              ? 'text-red-300 font-semibold'
+                              : 'text-emerald-300 font-semibold'
+                          }
+                        >
+                          {cantidadTotal}
+                        </span>
+                        {cantidadTotal <= THRESHOLD && (
+                          <span className="flex items-center text-red-400 font-bold text-[0.65rem] animate-pulse">
+                            <FaExclamationTriangle className="mr-1" />
+                            ¡Stock bajo!
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[0.65rem] uppercase tracking-wide text-gray-400">
+                        SKU
+                      </div>
+                      <div className="truncate font-mono text-[0.7rem] text-gray-100">
+                        {group.items[0]?.codigo_sku || '—'}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[0.65rem] uppercase tracking-wide text-gray-400">
+                        Otros locales
+                      </div>
+                      {otrosLocalesConStock.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {otrosLocalesConStock.map((l) => (
+                            <span
+                              key={l.id}
+                              className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[0.65rem] text-gray-100"
+                            >
+                              {l.nombre}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-gray-500 text-[0.7rem]">
+                          Solo en este local
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* FOOTER: Acciones */}
+                <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between gap-2">
+                  <p className="text-[0.7rem] text-gray-400">
+                    Registros en grupo:{' '}
+                    <span className="font-semibold text-gray-200">
+                      {group.items.length}
+                    </span>
+                  </p>
+
                   {userLevel === 'socio' && (
-                    <>
+                    <div className="flex items-center gap-2">
                       {/* Imprimir */}
                       <div className="relative group">
                         <button
@@ -1183,21 +1265,17 @@ const StockGet = () => {
                           disabled={
                             descargandoTicket || !hayImprimiblesEnGrupo(group)
                           }
-                          className={`mt-2 mb-2 w-9 h-9 rounded-lg text-white flex items-center justify-center disabled:opacity-60
-            ${
-              hayImprimiblesEnGrupo(group)
-                ? 'bg-orange-500 hover:bg-orange-400'
-                : 'bg-orange-500/50 cursor-not-allowed'
-            }`}
+                          className={`w-8 h-8 rounded-lg text-white flex items-center justify-center disabled:opacity-50
+              ${
+                hayImprimiblesEnGrupo(group)
+                  ? 'bg-orange-500 hover:bg-orange-400'
+                  : 'bg-orange-500/50 cursor-not-allowed'
+              }`}
                           aria-label="Imprimir código de barras"
                         >
-                          <FaTicketAlt className="text-white/90" />
+                          <FaTicketAlt className="text-white/90 text-sm" />
                         </button>
-                        <span
-                          className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full
-                     bg-gray-900 text-white text-xs px-2 py-1 rounded shadow whitespace-nowrap
-                     opacity-0 group-hover:opacity-100 transition-none z-[2000]"
-                        >
+                        <span className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full bg-gray-900 text-white text-xs px-2 py-1 rounded shadow whitespace-nowrap opacity-0 group-hover:opacity-100 transition-none z-[2000]">
                           Imprimir código de barras
                         </span>
                       </div>
@@ -1207,10 +1285,10 @@ const StockGet = () => {
                         <button
                           type="button"
                           onClick={() => abrirDuplicar(group)}
-                          className="mt-2 mb-2 w-9 h-9 bg-blue-600 hover:bg-blue-500 rounded-lg text-white flex items-center justify-center"
+                          className="w-8 h-8 bg-blue-600 hover:bg-blue-500 rounded-lg text-white flex items-center justify-center"
                           aria-label="Duplicar"
                         >
-                          <FaCopy className="text-white/90" />
+                          <FaCopy className="text-white/90 text-sm" />
                         </button>
                         <span className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full bg-gray-900 text-white text-xs px-2 py-1 rounded shadow whitespace-nowrap opacity-0 group-hover:opacity-100 transition-none z-[2000]">
                           Duplicar
@@ -1222,25 +1300,25 @@ const StockGet = () => {
                         <button
                           type="button"
                           onClick={() => openModal(group.items?.[0], null)}
-                          className="mt-2 mb-2 w-9 h-9 bg-yellow-500 hover:bg-yellow-400 rounded-lg text-white flex items-center justify-center"
+                          className="w-8 h-8 bg-yellow-500 hover:bg-yellow-400 rounded-lg text-white flex items-center justify-center"
                           aria-label="Editar"
                         >
-                          <FaEdit className="text-white/90" />
+                          <FaEdit className="text-white/90 text-sm" />
                         </button>
                         <span className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full bg-gray-900 text-white text-xs px-2 py-1 rounded shadow whitespace-nowrap opacity-0 group-hover:opacity-100 transition-none z-[2000]">
                           Editar
                         </span>
                       </div>
 
-                      {/* Ajustar grupo (ruedita) */}
+                      {/* Ajustar grupo */}
                       <div className="relative group">
                         <button
                           type="button"
                           onClick={() => openModal(null, group)}
-                          className="mt-2 mb-2 w-9 h-9 bg-amber-600 hover:bg-amber-500 rounded-lg text-white flex items-center justify-center"
+                          className="w-8 h-8 bg-amber-600 hover:bg-amber-500 rounded-lg text-white flex items-center justify-center"
                           aria-label="Ajustar grupo"
                         >
-                          <FaCog className="text-white/90" />
+                          <FaCog className="text-white/90 text-sm" />
                         </button>
                         <span className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full bg-gray-900 text-white text-xs px-2 py-1 rounded shadow whitespace-nowrap opacity-0 group-hover:opacity-100 transition-none z-[2000]">
                           Ajustar grupo
@@ -1255,16 +1333,16 @@ const StockGet = () => {
                             setGrupoAEliminar(group);
                             setOpenConfirm(true);
                           }}
-                          className="mt-2 mb-2 w-9 h-9 bg-red-600 hover:bg-red-500 rounded-lg text-white flex items-center justify-center"
+                          className="w-8 h-8 bg-red-600 hover:bg-red-500 rounded-lg text-white flex items-center justify-center"
                           aria-label="Eliminar"
                         >
-                          <FaTrash className="text-white/90" />
+                          <FaTrash className="text-white/90 text-sm" />
                         </button>
                         <span className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 -translate-y-full bg-gray-900 text-white text-xs px-2 py-1 rounded shadow whitespace-nowrap opacity-0 group-hover:opacity-100 transition-none z-[2000]">
                           Eliminar
                         </span>
                       </div>
-                    </>
+                    </div>
                   )}
                 </div>
               </motion.div>
@@ -1857,6 +1935,11 @@ const StockGet = () => {
       />
 
       <ToastContainer />
+      <ModalAlertasStockBajo
+        open={showAlertasStock}
+        onClose={() => setShowAlertasStock(false)}
+        threshold={10} // menor o igual a 10 unidades
+      />
     </div>
   );
 };
