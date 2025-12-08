@@ -1,12 +1,12 @@
 /*
  * Programador: Benjamin Orellana
- * Fecha Actualización: 22 / 11 / 2025
- * Versión: 1.1
+ * Fecha Actualización: 08 / 12 / 2025
+ * Versión: 1.2
  *
  * Descripción:
  * Panel principal del sistema (El Sueño) con acceso rápido a módulos
- * clave: stock, compras, ventas, proveedores, pedidos, bancos, cheques
- * y tesorería. Diseño moderno tipo dashboard con cards glass.
+ * clave: stock, compras, ventas, ARCA/facturación, proveedores, pedidos,
+ * bancos, cheques y tesorería. Diseño moderno tipo dashboard con cards glass.
  *
  * Tema: Renderización - Dashboard
  * Capa: Frontend
@@ -28,7 +28,8 @@ import {
   FaUsers,
   FaUniversity,
   FaMoneyCheckAlt,
-  FaPiggyBank
+  FaPiggyBank,
+  FaFileInvoiceDollar // <-- ARCA / Facturación
 } from 'react-icons/fa';
 
 // --------- Tile genérico de módulo ----------
@@ -120,8 +121,8 @@ const AdminPage = () => {
                 >
                   Hola{' '}
                   <span className="font-semibold">{userName || 'equipo'}</span>,
-                  elegí un módulo para gestionar stock, compras, ventas y
-                  tesorería.
+                  elegí un módulo para gestionar stock, compras, ventas,
+                  facturación y tesorería.
                 </motion.p>
               </div>
 
@@ -169,11 +170,19 @@ const AdminPage = () => {
               />
 
               <DashboardTile
+                title="ARCA / Facturación"
+                description="Empresas, puntos de venta y comprobantes fiscales electrónicos."
+                to="/dashboard/arca"
+                icon={FaFileInvoiceDollar}
+                delay={0.16}
+              />
+
+              <DashboardTile
                 title="Proveedores"
                 description="Altas, bajas y administración de proveedores comerciales."
                 to="/dashboard/proveedores/proveedores"
                 icon={FaUsers}
-                delay={0.16}
+                delay={0.18}
               />
 
               <DashboardTile
@@ -181,7 +190,7 @@ const AdminPage = () => {
                 description="Pedidos internos entre sucursales y logística de reposición."
                 to="/dashboard/stock/pedidos"
                 icon={FaTruckMoving}
-                delay={0.18}
+                delay={0.2}
               />
 
               <DashboardTile
@@ -189,7 +198,7 @@ const AdminPage = () => {
                 description="Gestión del equipo comercial, metas y asignación de ventas."
                 to="/dashboard/vendedores"
                 icon={FaUsers}
-                delay={0.2}
+                delay={0.22}
               />
 
               <DashboardTile
@@ -197,7 +206,7 @@ const AdminPage = () => {
                 description="Cuentas bancarias, movimientos y conciliación financiera."
                 to="/dashboard/bancos"
                 icon={FaUniversity}
-                delay={0.22}
+                delay={0.24}
               />
 
               <DashboardTile
@@ -205,7 +214,7 @@ const AdminPage = () => {
                 description="Cheques recibidos y emitidos, historial de usos y estados."
                 to="/dashboard/cheques"
                 icon={FaMoneyCheckAlt}
-                delay={0.24}
+                delay={0.26}
               />
 
               <DashboardTile
@@ -213,7 +222,7 @@ const AdminPage = () => {
                 description="Flujo de fondos, caja central y visión global de tesorería."
                 to="/dashboard/tesoreria"
                 icon={FaPiggyBank}
-                delay={0.26}
+                delay={0.28}
               />
             </div>
           </div>

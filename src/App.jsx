@@ -89,6 +89,14 @@ import ImpuestosConfigPage from './Pages/Compras/ImpuestosConfigPage';
 import ScrollToTop from './Components/ScrollToTop';
 import OrdenesCompraListado from './Pages/Compras/OrdenesCompraListado';
 
+// -------------------------
+// MÓDULO ARCA  - 08-12-2025 Benjamin Orellana
+// -------------------------
+import AdminPageArca from './Pages/ARCA/AdminPageArca';
+import EmpresasCards from './Pages/ARCA/EmpresasCards';
+import PuntosVentaCards from './Pages/ARCA/PuntosVentaCards';
+import ComprobantesFiscalesCards from './Pages/ARCA/ComprobantesFiscalesCards';
+
 function AppContent() {
   const { hideLayoutFooter, hideLayoutNav } = useLayoutVisibility();
 
@@ -615,6 +623,42 @@ function AppContent() {
               <ProtectedRoute>
                 {' '}
                 <ImpuestosConfigPage />{' '}
+              </ProtectedRoute>
+            }
+          />
+          <Ruta
+            path="/dashboard/arca"
+            element={
+              <ProtectedRoute>
+                {' '}
+                <AdminPageArca />{' '}
+              </ProtectedRoute>
+            }
+          />
+          <Ruta
+            path="/dashboard/arca/empresas"
+            element={
+              <ProtectedRoute>
+                {' '}
+                <EmpresasCards />{' '}
+              </ProtectedRoute>
+            }
+          />
+          <Ruta
+            path="/dashboard/arca/puntos-venta"
+            element={
+              <ProtectedRoute>
+                {' '}
+                <PuntosVentaCards />{' '}
+              </ProtectedRoute>
+            }
+          />
+          <Ruta
+            path="/dashboard/arca/comprobantes-fiscales"
+            element={
+              <ProtectedRoute>
+                {' '}
+                <ComprobantesFiscalesCards />{' '}
               </ProtectedRoute>
             }
           />
