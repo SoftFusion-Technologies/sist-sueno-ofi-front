@@ -141,6 +141,11 @@ export default function TicketVentaModal({
   const [localInfo, setLocalInfo] = useState(null);
 
   const comprobante = venta?.comprobanteFiscal || null;
+  const esSimulado = comprobante?.cae?.startsWith('SIM');
+
+  const cf = venta?.comprobanteFiscal || null;
+  const empresa = cf?.empresa || null;
+  const pv = cf?.puntoVenta || null;
 
   const mapTipoComprobante = (tipo, letra) => {
     const code = Number(tipo);
@@ -153,51 +158,6 @@ export default function TicketVentaModal({
   const labelComprobante =
     comprobante &&
     mapTipoComprobante(comprobante.tipo_comprobante, comprobante.letra);
-
-  const esSimulado = comprobante?.cae?.startsWith('SIM');
-
-  const cf = venta?.comprobanteFiscal || null;
-  const empresa = cf?.empresa || null;
-  const pv = cf?.puntoVenta || null;
-
-  const tipoComprobanteMap = {
-    1: 'Factura A',
-    6: 'Factura B',
-    11: 'Factura C',
-    3: 'Nota de Crédito A',
-    8: 'Nota de Crédito B'
-    // podés ir sumando luego según necesites
-  };
-
-  const tipoLabel = cf
-    ? tipoComprobanteMap[cf.tipo_comprobante] ||
-      `Comprobante ${cf.letra || ''}`.trim()
-    : 'Ticket simple';
-
-  // Punto de venta y número de comprobante con formato AFIP
-  const pvNumero =
-    pv?.numero != null ? String(pv.numero).padStart(4, '0') : '--';
-  const cbteNumero =
-    cf?.numero_comprobante != null
-      ? String(cf.numero_comprobante).padStart(8, '0')
-      : '--';
-
-  // Fechas formateadas
-  const caeVto = cf?.cae_vencimiento
-    ? new Date(cf.cae_vencimiento).toLocaleDateString('es-AR')
-    : null;
-
-  const inicioAct = empresa?.inicio_actividades
-    ? new Date(empresa.inicio_actividades).toLocaleDateString('es-AR')
-    : null;
-
-
-  // Preferencias visibles para encabezado
-  const nombreTiendaVisible =
-    empresa?.nombre_fantasia || empresa?.razon_social || nombreTienda;
-
-  const direccionVisible = empresa?.domicilio_fiscal || direccion;
-  const emailVisible = empresa?.email_facturacion || email;
 
   // Configuración de ticket según el local de la venta
   useEffect(() => {
@@ -247,6 +207,9 @@ export default function TicketVentaModal({
     venta.local?.nombre ||
     '';
 
+  // Preferencias visibles para encabezado
+  const nombreTiendaVisible =
+    empresa?.nombre_fantasia || empresa?.razon_social || nombreTienda;
   const direccion = config?.direccion || localInfo?.direccion || '';
 
   const telefono = config?.telefono || localInfo?.telefono || '';
@@ -448,6 +411,41 @@ export default function TicketVentaModal({
       win.close();
     }, 500);
   };
+
+
+  const tipoComprobanteMap = {
+    1: 'Factura A',
+    6: 'Factura B',
+    11: 'Factura C',
+    3: 'Nota de Crédito A',
+    8: 'Nota de Crédito B'
+    // podés ir sumando luego según necesites
+  };
+
+  const tipoLabel = cf
+    ? tipoComprobanteMap[cf.tipo_comprobante] ||
+      `Comprobante ${cf.letra || ''}`.trim()
+    : 'Ticket simple';
+
+  // Punto de venta y número de comprobante con formato AFIP
+  const pvNumero =
+    pv?.numero != null ? String(pv.numero).padStart(4, '0') : '--';
+  const cbteNumero =
+    cf?.numero_comprobante != null
+      ? String(cf.numero_comprobante).padStart(8, '0')
+      : '--';
+
+  // Fechas formateadas
+  const caeVto = cf?.cae_vencimiento
+    ? new Date(cf.cae_vencimiento).toLocaleDateString('es-AR')
+    : null;
+
+  const inicioAct = empresa?.inicio_actividades
+    ? new Date(empresa.inicio_actividades).toLocaleDateString('es-AR')
+    : null;
+
+  const direccionVisible = empresa?.domicilio_fiscal || direccion;
+  const emailVisible = empresa?.email_facturacion || email;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
