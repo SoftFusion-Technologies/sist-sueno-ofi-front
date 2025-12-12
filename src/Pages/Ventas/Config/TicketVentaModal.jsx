@@ -140,6 +140,65 @@ export default function TicketVentaModal({
   const [config, setConfig] = useState(null);
   const [localInfo, setLocalInfo] = useState(null);
 
+  const comprobante = venta?.comprobanteFiscal || null;
+
+  const mapTipoComprobante = (tipo, letra) => {
+    const code = Number(tipo);
+    if (code === 1 && letra === 'A') return 'FACTURA A';
+    if (code === 6 && letra === 'B') return 'FACTURA B';
+    if (code === 11 && letra === 'C') return 'FACTURA C';
+    return `COMPROBANTE ${letra || ''}`.trim();
+  };
+
+  const labelComprobante =
+    comprobante &&
+    mapTipoComprobante(comprobante.tipo_comprobante, comprobante.letra);
+
+  const esSimulado = comprobante?.cae?.startsWith('SIM');
+
+  const cf = venta?.comprobanteFiscal || null;
+  const empresa = cf?.empresa || null;
+  const pv = cf?.puntoVenta || null;
+
+  const tipoComprobanteMap = {
+    1: 'Factura A',
+    6: 'Factura B',
+    11: 'Factura C',
+    3: 'Nota de Crédito A',
+    8: 'Nota de Crédito B'
+    // podés ir sumando luego según necesites
+  };
+
+  const tipoLabel = cf
+    ? tipoComprobanteMap[cf.tipo_comprobante] ||
+      `Comprobante ${cf.letra || ''}`.trim()
+    : 'Ticket simple';
+
+  // Punto de venta y número de comprobante con formato AFIP
+  const pvNumero =
+    pv?.numero != null ? String(pv.numero).padStart(4, '0') : '--';
+  const cbteNumero =
+    cf?.numero_comprobante != null
+      ? String(cf.numero_comprobante).padStart(8, '0')
+      : '--';
+
+  // Fechas formateadas
+  const caeVto = cf?.cae_vencimiento
+    ? new Date(cf.cae_vencimiento).toLocaleDateString('es-AR')
+    : null;
+
+  const inicioAct = empresa?.inicio_actividades
+    ? new Date(empresa.inicio_actividades).toLocaleDateString('es-AR')
+    : null;
+
+
+  // Preferencias visibles para encabezado
+  const nombreTiendaVisible =
+    empresa?.nombre_fantasia || empresa?.razon_social || nombreTienda;
+
+  const direccionVisible = empresa?.domicilio_fiscal || direccion;
+  const emailVisible = empresa?.email_facturacion || email;
+
   // Configuración de ticket según el local de la venta
   useEffect(() => {
     if (!venta) return;
@@ -410,9 +469,11 @@ export default function TicketVentaModal({
         >
           {/* Encabezado */}
           <div className="text-center mb-4">
-            {/* Ticket simple */}
+            {/* Tipo de comprobante o ticket simple */}
             <div className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">
-              TICKET SIMPLE
+              {cf
+                ? `${tipoLabel.toUpperCase()} ${cf.letra || ''}`
+                : 'TICKET SIMPLE'}
             </div>
 
             {/* Logo desde logo_path */}
@@ -425,12 +486,12 @@ export default function TicketVentaModal({
               />
             )}
 
-            {/* Nombre tienda (ticket > local) */}
+            {/* Nombre visible (fantasía / razón social / nombreTienda) */}
             <div
               className="font-extrabold text-2xl tracking-widest mb-1 uppercase"
               style={{ color: '#6d28d9', letterSpacing: 2 }}
             >
-              {nombreTienda}
+              {nombreTiendaVisible}
             </div>
 
             {/* Lema solo si está en el ticket */}
@@ -443,16 +504,31 @@ export default function TicketVentaModal({
               </div>
             )}
 
-            {/* Dirección + Teléfono: ticket > local */}
-            {(direccion || telefono) && (
-              <div className="text-xs text-gray-600 dark:text-gray-300 font-medium mb-1">
-                {direccion}
+            {/* Datos fiscales si hay empresa */}
+            {empresa && (
+              <div className="text-[11px] text-gray-700 dark:text-gray-200 font-medium space-y-0.5 mt-1">
+                <div>Razón social: {empresa.razon_social}</div>
+                <div>CUIT: {empresa.cuit}</div>
+                {empresa.condicion_iva && (
+                  <div>IVA: {empresa.condicion_iva}</div>
+                )}
+                {empresa.iibb && <div>IIBB: {empresa.iibb}</div>}
+                {inicioAct && <div>Inicio actividades: {inicioAct}</div>}
+              </div>
+            )}
+
+            {/* Dirección + Teléfono (prioriza domicilio fiscal) */}
+            {(direccionVisible || telefono) && (
+              <div className="text-xs text-gray-600 dark:text-gray-300 font-medium mb-1 mt-1">
+                {direccionVisible}
                 {telefono && <span> • {telefono}</span>}
               </div>
             )}
 
-            {/* Email: ticket > local */}
-            {email && <div className="text-xs text-gray-500">{email}</div>}
+            {/* Email de facturación si existe, si no el del local */}
+            {emailVisible && (
+              <div className="text-xs text-gray-500">{emailVisible}</div>
+            )}
           </div>
 
           {/* Info Venta */}
@@ -462,6 +538,30 @@ export default function TicketVentaModal({
               {venta.fecha ? new Date(venta.fecha).toLocaleString() : ''}
             </span>
           </div>
+
+          {/* Datos fiscales del comprobante (si existe) */}
+          {cf && (
+            <div className="mb-3 text-[11px] text-gray-700 dark:text-gray-200 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-2 space-y-0.5">
+              <div className="font-bold text-xs">
+                {tipoLabel} {cf.letra} · PV {pvNumero} · N° {cbteNumero}
+              </div>
+              <div>
+                Fecha emisión:{' '}
+                {cf.fecha_emision
+                  ? new Date(cf.fecha_emision).toLocaleString('es-AR')
+                  : ''}
+              </div>
+              <div>
+                CAE: <span className="font-mono">{cf.cae}</span>
+              </div>
+              {caeVto && <div>Vencimiento CAE: {caeVto}</div>}
+              {esSimulado && (
+                <div className="mt-1 text-[10px] font-bold text-red-600">
+                  COMPROBANTE SIMULADO - SIN VALIDEZ FISCAL
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 gap-1 mb-3 text-gray-800 dark:text-gray-200 text-sm">
             <div>
@@ -714,6 +814,28 @@ export default function TicketVentaModal({
               {totalEnLetras}
             </div>
           </div>
+
+          {/* Datos fiscales (CAE) si existe comprobante */}
+          {comprobante && (
+            <div className="border-t border-dotted border-gray-300 mt-4 pt-2 space-y-1 text-[11px] text-gray-600 dark:text-gray-300">
+              <div className="font-bold text-gray-700 dark:text-gray-100 mb-1">
+                Datos fiscales {esSimulado && '(simulado)'}
+              </div>
+              <div>
+                CAE: <span className="font-mono">{comprobante.cae}</span>
+              </div>
+              <div>
+                Vencimiento CAE:{' '}
+                <span className="font-mono">
+                  {comprobante.cae_vencimiento
+                    ? new Date(comprobante.cae_vencimiento).toLocaleDateString(
+                        'es-AR'
+                      )
+                    : '-'}
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Footer */}
           {config?.mensaje_footer ? (

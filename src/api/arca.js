@@ -187,3 +187,6 @@ export const deleteComprobanteFiscal = async (id) => {
   const { data } = await client.delete(`/arca/comprobantes-fiscales/${id}`);
   return data;
 };
+
+export const reintentarFacturacionVenta = (ventaId) =>
+  client.post(`/ventas/${ventaId}/reintentar-facturacion`).then((res) => res.data);

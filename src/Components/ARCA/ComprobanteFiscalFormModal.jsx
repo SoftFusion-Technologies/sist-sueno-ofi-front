@@ -33,7 +33,6 @@ const TIPO_OPCIONES = [
   { value: '12', label: '12 - Nota de débito C' }
 ];
 
-
 const toDateInput = (val) => {
   if (!val) return '';
   try {
@@ -57,7 +56,8 @@ export default function ComprobanteFiscalFormModal({
   onSubmit,
   initial,
   empresas,
-  puntosVenta
+  puntosVenta,
+  readOnly = false
 }) {
   const [form, setForm] = useState({
     venta_id: '',
@@ -440,7 +440,7 @@ export default function ComprobanteFiscalFormModal({
                                  focus:outline-none focus:ring-2 focus:ring-cyan-300/40 focus:border-transparent"
                     >
                       {ESTADOS.map((e) => (
-                        <option className="text-black"  key={e} value={e}>
+                        <option className="text-black" key={e} value={e}>
                           {e.charAt(0).toUpperCase() + e.slice(1)}
                         </option>
                       ))}
@@ -569,6 +569,7 @@ export default function ComprobanteFiscalFormModal({
                 </div>
 
                 {/* Acciones */}
+
                 <motion.div
                   variants={fieldV}
                   className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-1"
@@ -580,18 +581,20 @@ export default function ComprobanteFiscalFormModal({
                   >
                     Cancelar
                   </button>
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-emerald-500 text-white font-semibold
+                  {!readOnly && (
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-emerald-500 text-white font-semibold
                                hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed transition"
-                  >
-                    {saving
-                      ? 'Guardando…'
-                      : isEdit
-                      ? 'Guardar cambios'
-                      : 'Crear comprobante'}
-                  </button>
+                    >
+                      {saving
+                        ? 'Guardando…'
+                        : isEdit
+                        ? 'Guardar cambios'
+                        : 'Crear comprobante'}
+                    </button>
+                  )}
                 </motion.div>
               </motion.form>
             </div>

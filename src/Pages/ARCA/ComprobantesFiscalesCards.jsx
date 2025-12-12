@@ -18,7 +18,8 @@ import {
   listComprobantesFiscales,
   createComprobanteFiscalManual,
   updateComprobanteFiscal,
-  deleteComprobanteFiscal
+  deleteComprobanteFiscal,
+  reintentarFacturacionVenta
 } from '../../api/arca';
 
 import {
@@ -57,6 +58,7 @@ export default function ComprobantesFiscalesCards() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [modalMode, setModalMode] = useState('create'); // 'create' | 'edit' | 'view'
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [toDelete, setToDelete] = useState(null);
@@ -139,11 +141,19 @@ export default function ComprobantesFiscalesCards() {
 
   const onNew = () => {
     setEditing(null);
+    setModalMode('create');
     setModalOpen(true);
   };
 
   const onEdit = (item) => {
     setEditing(item);
+    setModalMode('edit');
+    setModalOpen(true);
+  };
+
+  const onView = (item) => {
+    setEditing(item);
+    setModalMode('view');
     setModalOpen(true);
   };
 
@@ -205,6 +215,59 @@ export default function ComprobantesFiscalesCards() {
   const onAskDelete = (item) => {
     setToDelete(item);
     setConfirmOpen(true);
+  };
+
+  const onRetryFacturacion = async (item) => {
+    if (!item?.venta_id) {
+      return showWarnSwal({
+        title: 'Sin venta asociada',
+        text: 'Este comprobante no tiene una venta asociada para reintentar la facturación.'
+      });
+    }
+
+    const res = await showConfirmSwal({
+      title: `¿Reintentar facturación?`,
+      text: `Se reintentará la facturación de la venta #${item.venta_id}.`,
+      confirmText: 'Sí, reintentar'
+    });
+
+    if (!res.isConfirmed) return;
+
+    try {
+      const data = await reintentarFacturacionVenta(item.venta_id);
+
+      const estado = data?.estado || data?.comprobante?.estado || 'desconocido';
+      const cae = data?.comprobante?.cae || '—';
+      const numero = data?.comprobante?.numero_comprobante ?? '—';
+
+      if (estado === 'aprobado') {
+        await showSuccessSwal({
+          title: 'Facturación aprobada',
+          text: `Estado: ${estado.toUpperCase()}\nComprobante #${numero}\nCAE: ${cae}`
+        });
+      } else {
+        await showWarnSwal({
+          title: 'Reintento procesado',
+          text: `Estado: ${estado.toUpperCase()}\nRevisá el detalle en el comprobante.`,
+          tips: [
+            'Verificá los datos fiscales del cliente y la empresa.',
+            'Revisá el log de ARCA si implementaste bitácora.'
+          ]
+        });
+      }
+
+      // refrescamos la grilla para ver los cambios (CAE, estado, etc.)
+      await fetchData();
+    } catch (err) {
+      const { mensajeError, tips } = err || {};
+      await showErrorSwal({
+        title: 'No se pudo reintentar',
+        text:
+          mensajeError ||
+          'Ocurrió un error al intentar reintentar la facturación.',
+        tips
+      });
+    }
   };
 
   const onConfirmDelete = async () => {
@@ -405,7 +468,9 @@ export default function ComprobantesFiscalesCards() {
                   <ComprobanteFiscalCard
                     key={it.id}
                     item={it}
+                    onView={onView} // 👈 nuevo
                     onEdit={onEdit}
+                    onRetryFacturacion={onRetryFacturacion} // 👈 nuevo
                     onDelete={onAskDelete}
                     empresaLabel={empresasMap[it.empresa_id]}
                     puntoVentaLabel={puntosVentaMap[it.punto_venta_id]}
@@ -423,11 +488,13 @@ export default function ComprobantesFiscalesCards() {
         onClose={() => {
           setModalOpen(false);
           setEditing(null);
+          setModalMode('create');
         }}
         onSubmit={onSubmit}
         initial={editing}
         empresas={empresas}
         puntosVenta={puntosVenta}
+        readOnly={modalMode === 'view'} // 👈 NUEVO
       />
 
       {/* Confirm eliminar */}

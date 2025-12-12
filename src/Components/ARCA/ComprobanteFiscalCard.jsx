@@ -55,8 +55,11 @@ const Field = ({ label, children }) => (
 
 const buttonBase =
   'group relative inline-flex items-center justify-center gap-2 px-3.5 py-2 min-h-[40px] text-[13px] leading-tight whitespace-nowrap font-semibold text-white rounded-xl border border-white/20 bg-gradient-to-br shadow transition-all hover:scale-[1.02] hover:brightness-110 focus:outline-none focus:ring-2';
+
 const BTN = {
+  view: `${buttonBase} from-zinc-500/90 to-zinc-700/90 focus:ring-zinc-300`,
   edit: `${buttonBase} from-sky-400/80 to-sky-500/90 focus:ring-sky-300`,
+  retry: `${buttonBase} from-amber-400/90 to-amber-500/90 focus:ring-amber-300`,
   del: `${buttonBase} from-rose-500/85 to-rose-700/90 focus:ring-rose-300`
 };
 
@@ -64,8 +67,10 @@ export default function ComprobanteFiscalCard({
   item,
   empresaLabel,
   puntoVentaLabel,
+  onView,
   onEdit,
   onDelete,
+  onRetryFacturacion,
   color = '#0ea5e9' // sky-500
 }) {
   const num =
@@ -102,6 +107,8 @@ export default function ComprobanteFiscalCard({
     : '—';
 
   const estado = item?.estado || 'pendiente';
+
+  const puedeReintentar = Boolean(item?.venta_id);
 
   return (
     <motion.div
@@ -165,12 +172,48 @@ export default function ComprobanteFiscalCard({
             <Field label="Venta ID">{item?.venta_id ?? '—'}</Field>
           </div>
 
+          {/* Botones de acción */}
           <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-2">
-            <button onClick={() => onEdit?.(item)} className={BTN.edit}>
-              <FaEdit className="text-sm" />
-              <span className="hidden md:inline">Editar / Ver</span>
+            <button
+              onClick={() => onView?.(item)}
+              className={BTN.view}
+              type="button"
+            >
+              <FaFileInvoiceDollar className="text-sm" />
+              <span className="hidden md:inline">Ver</span>
             </button>
-            <button onClick={() => onDelete?.(item)} className={BTN.del}>
+
+            <button
+              onClick={() => onEdit?.(item)}
+              className={BTN.edit}
+              type="button"
+            >
+              <FaEdit className="text-sm" />
+              <span className="hidden md:inline">Editar</span>
+            </button>
+
+            <button
+              onClick={() => puedeReintentar && onRetryFacturacion?.(item)}
+              className={`${BTN.retry} ${
+                !puedeReintentar ? 'opacity-60 cursor-not-allowed' : ''
+              }`}
+              type="button"
+              disabled={!puedeReintentar}
+              title={
+                puedeReintentar
+                  ? 'Reintentar facturación de la venta asociada'
+                  : 'No hay venta asociada para reintentar facturación'
+              }
+            >
+              <FaRegClock className="text-sm" />
+              <span className="hidden md:inline">Reintentar facturación</span>
+            </button>
+
+            <button
+              onClick={() => onDelete?.(item)}
+              className={BTN.del}
+              type="button"
+            >
               <FaTrash className="text-sm" />
               <span className="hidden md:inline">Eliminar</span>
             </button>
