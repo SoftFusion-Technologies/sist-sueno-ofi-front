@@ -16,6 +16,7 @@ import {
   Hash,
   DollarSign
 } from 'lucide-react';
+import { Alerts, getErrorMessage } from '../../utils/alerts';
 
 const ESTADOS = ['pendiente', 'aprobado', 'rechazado'];
 
@@ -156,9 +157,10 @@ export default function ComprobanteFiscalFormModal({
 
   const submit = async (e) => {
     e.preventDefault();
+
     const errorMsg = validate();
     if (errorMsg) {
-      alert(errorMsg); // si querés después lo cambiamos a SweetAlert
+      await Alerts.error('Validación', errorMsg);
       return;
     }
 
@@ -184,7 +186,24 @@ export default function ComprobanteFiscalFormModal({
 
     try {
       setSaving(true);
+      Alerts.loading(
+        isEdit ? 'Actualizando comprobante...' : 'Guardando comprobante...'
+      );
       await onSubmit(payload);
+
+      Alerts.close();
+      Alerts.toastSuccess(
+        isEdit ? 'Comprobante actualizado' : 'Comprobante guardado'
+      );
+
+      // opcional: cerrar modal al guardar
+      // onClose?.();
+    } catch (err) {
+      Alerts.close();
+      await Alerts.error(
+        'No se pudo guardar',
+        getErrorMessage(err, 'Error al guardar el comprobante')
+      );
     } finally {
       setSaving(false);
     }

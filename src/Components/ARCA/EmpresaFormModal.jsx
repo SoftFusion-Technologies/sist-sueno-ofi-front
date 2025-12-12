@@ -17,6 +17,7 @@ import {
   Phone,
   CalendarClock
 } from 'lucide-react';
+import { Alerts, getErrorMessage } from '../../utils/alerts';
 
 const IVA_OPTIONS = [
   { value: 'RI', label: 'Responsable Inscripto' },
@@ -68,20 +69,40 @@ export default function EmpresaFormModal({ open, onClose, onSubmit, initial }) {
     setForm((f) => ({ ...f, [name]: value }));
   };
 
-  const submit = async (e) => {
-    e.preventDefault();
-    if (!form.razon_social.trim() || !form.cuit.trim()) {
-      alert('La razón social y el CUIT son obligatorios');
-      return;
-    }
-    try {
-      setSaving(true);
-      await onSubmit(form);
-      onClose();
-    } finally {
-      setSaving(false);
-    }
-  };
+ const submit = async (e) => {
+   e.preventDefault();
+
+   if (!form.razon_social.trim() || !form.cuit.trim()) {
+     await Alerts.error(
+       'Validación',
+       'La razón social y el CUIT son obligatorios.'
+     );
+     return;
+   }
+
+   try {
+     setSaving(true);
+     Alerts.loading(
+       isEdit ? 'Actualizando empresa...' : 'Guardando empresa...'
+     );
+
+     await onSubmit(form);
+
+     Alerts.close();
+     Alerts.toastSuccess(isEdit ? 'Empresa actualizada' : 'Empresa creada');
+
+     onClose();
+   } catch (err) {
+     Alerts.close();
+     await Alerts.error(
+       'No se pudo guardar',
+       getErrorMessage(err, 'Error al guardar la empresa')
+     );
+   } finally {
+     setSaving(false);
+   }
+ };
+
 
   return (
     <AnimatePresence>

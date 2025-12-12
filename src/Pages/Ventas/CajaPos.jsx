@@ -47,6 +47,54 @@ import {
   getNombreUsuario
 } from '../../utils/utils.js';
 // Microcomponente Glass Card
+import Swal from 'sweetalert2';
+
+const toast = Swal.mixin({
+  toast: true,
+  position: 'top-end',
+  showConfirmButton: false,
+  timer: 2200,
+  timerProgressBar: true
+});
+
+const swalError = (title, text) =>
+  Swal.fire({
+    icon: 'error',
+    title,
+    text,
+    confirmButtonText: 'Entendido',
+    confirmButtonColor: '#059669'
+  });
+
+const swalSuccess = (title, text) =>
+  Swal.fire({
+    icon: 'success',
+    title,
+    text,
+    confirmButtonText: 'OK',
+    confirmButtonColor: '#059669'
+  });
+
+const swalConfirm = ({ title, text }) =>
+  Swal.fire({
+    icon: 'warning',
+    title,
+    text,
+    showCancelButton: true,
+    confirmButtonText: 'Sí, confirmar',
+    cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#dc2626',
+    cancelButtonColor: '#64748b',
+    reverseButtons: true
+  });
+
+const swalLoading = (title = 'Procesando...') =>
+  Swal.fire({
+    title,
+    allowOutsideClick: false,
+    allowEscapeKey: false,
+    didOpen: () => Swal.showLoading()
+  });
 
 const BASE_URL = 'http://localhost:8080';
 const GlassCard = ({ children, className = '' }) => (
@@ -177,76 +225,122 @@ export default function CajaPOS() {
 
   const abrirCaja = async () => {
     if (
-      !saldoInicial ||
+      saldoInicial === '' ||
+      saldoInicial === null ||
       isNaN(parseFloat(saldoInicial)) ||
       parseFloat(saldoInicial) < 0
     ) {
-      alert('Ingresá un saldo inicial válido');
+      await swalError('Saldo inválido', 'Ingresá un saldo inicial válido.');
       return;
     }
+
     try {
+      swalLoading('Abriendo caja...');
       const res = await axios.post(`http://localhost:8080/caja`, {
         usuario_id: userId,
         local_id: userLocalId,
         saldo_inicial: parseFloat(saldoInicial)
       });
+
       setCajaActual(res.data.caja || res.data);
       setMovimientos([]);
       setSaldoInicial('');
+
+      Swal.close();
+      toast.fire({ icon: 'success', title: 'Caja abierta correctamente' });
     } catch (err) {
-      alert(err.response?.data?.mensajeError || 'Error al abrir caja');
+      Swal.close();
+      await swalError(
+        'No se pudo abrir la caja',
+        err.response?.data?.mensajeError || 'Error al abrir caja'
+      );
     }
   };
 
   const cerrarCaja = async () => {
     if (!cajaActual) return;
-    if (!window.confirm('¿Cerrar caja?')) return;
+
+    const confirm = await swalConfirm({
+      title: '¿Cerrar caja?',
+      text: 'Se registrará el cierre y no podrás seguir cargando movimientos.'
+    });
+    if (!confirm.isConfirmed) return;
+
     const totalIngresos = movimientos
       .filter((m) => m.tipo === 'ingreso')
       .reduce((sum, m) => sum + Number(m.monto), 0);
+
     const totalEgresos = movimientos
       .filter((m) => m.tipo === 'egreso')
       .reduce((sum, m) => sum + Number(m.monto), 0);
+
     const saldoFinal =
       Number(cajaActual.saldo_inicial) + totalIngresos - totalEgresos;
+
     try {
+      swalLoading('Cerrando caja...');
       await axios.put(`http://localhost:8080/caja/${cajaActual.id}`, {
         fecha_cierre: new Date(),
         saldo_final: saldoFinal
       });
+
       setCajaActual(null);
       setMovimientos([]);
+
+      Swal.close();
+      await swalSuccess(
+        'Caja cerrada',
+        `Saldo final: $${Number(saldoFinal).toLocaleString('es-AR')}`
+      );
     } catch (err) {
-      alert(err.response?.data?.mensajeError || 'Error al cerrar caja');
+      Swal.close();
+      await swalError(
+        'No se pudo cerrar la caja',
+        err.response?.data?.mensajeError || 'Error al cerrar caja'
+      );
     }
   };
 
   const registrarMovimiento = async () => {
     if (!cajaActual) return;
+
     if (
       !nuevoMovimiento.descripcion ||
       !nuevoMovimiento.monto ||
       isNaN(Number(nuevoMovimiento.monto))
     ) {
-      alert('Completá todos los datos');
+      await swalError(
+        'Datos incompletos',
+        'Completá descripción y monto válido.'
+      );
       return;
     }
+
     try {
+      swalLoading('Registrando movimiento...');
       await axios.post(`http://localhost:8080/movimientos_caja`, {
         caja_id: cajaActual.id,
         tipo: nuevoMovimiento.tipo,
         descripcion: nuevoMovimiento.descripcion,
         monto: Number(nuevoMovimiento.monto),
-        usuario_id: userId // 👈 necesario para el log
+        usuario_id: userId
       });
+
       const mov = await axios.get(
         `http://localhost:8080/movimientos/caja/${cajaActual.id}`
       );
 
       setMovimientos(mov.data);
       setNuevoMovimiento({ tipo: 'ingreso', monto: '', descripcion: '' });
+
+      Swal.close();
+      toast.fire({ icon: 'success', title: 'Movimiento registrado' });
     } catch (err) {
-      alert('Error al registrar movimiento');
+      Swal.close();
+      await swalError(
+        'Error al registrar movimiento',
+        err.response?.data?.mensajeError || 'No se pudo registrar el movimiento'
+      );
     }
   };
 
@@ -263,14 +357,22 @@ export default function CajaPOS() {
   // Función para obtener detalle de venta
   const mostrarDetalleVenta = async (idVenta) => {
     try {
+      swalLoading('Cargando detalle de venta...');
       const res = await fetch(
         `http://localhost:8080/ventas/${idVenta}/detalle`
       );
       if (!res.ok) throw new Error('No se pudo obtener el detalle');
+
       const data = await res.json();
       setDetalleVenta(data);
+
+      Swal.close();
     } catch (err) {
-      alert('No se pudo obtener el detalle de la venta');
+      Swal.close();
+      await swalError(
+        'No se pudo obtener el detalle',
+        'Verificá la conexión o intentá nuevamente.'
+      );
     }
   };
 

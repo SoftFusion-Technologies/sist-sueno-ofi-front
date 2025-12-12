@@ -18,6 +18,7 @@ import {
   KeySquare,
   BadgeCheck
 } from 'lucide-react';
+import { Alerts, getErrorMessage } from '../../utils/alerts';
 
 const MONEDAS = ['ARS', 'USD', 'EUR', 'OTRA'];
 
@@ -72,16 +73,38 @@ export default function BankAccountFormModal({
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!form.banco_id) return alert('Seleccione un banco');
-    if (!form.nombre_cuenta.trim())
-      return alert('El nombre/titular de la cuenta es obligatorio');
+
+    if (!form.banco_id) {
+      await Alerts.error('Validación', 'Seleccione un banco.');
+      return;
+    }
+    if (!form.nombre_cuenta.trim()) {
+      await Alerts.error(
+        'Validación',
+        'El nombre/titular de la cuenta es obligatorio.'
+      );
+      return;
+    }
+
     try {
       setSaving(true);
+      Alerts.loading(isEdit ? 'Actualizando cuenta...' : 'Creando cuenta...');
+
       await onSubmit({
         ...form,
         banco_id: Number(form.banco_id) || form.banco_id
       });
+
+      Alerts.close();
+      Alerts.toastSuccess(isEdit ? 'Cuenta actualizada' : 'Cuenta creada');
+
       onClose();
+    } catch (err) {
+      Alerts.close();
+      await Alerts.error(
+        'No se pudo guardar',
+        getErrorMessage(err, 'Error al guardar la cuenta bancaria')
+      );
     } finally {
       setSaving(false);
     }

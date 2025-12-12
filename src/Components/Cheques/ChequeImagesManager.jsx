@@ -28,6 +28,8 @@ import {
   listChequeImagenEventos,
   createChequeImagenEvento
 } from '../../api/chequesImagenes';
+import { Alerts, getErrorMessage } from '../../utils/alerts';
+import Swal from 'sweetalert2';
 
 /**
  * ChequeImagesManager
@@ -173,7 +175,12 @@ export default function ChequeImagesManager({ chequeId }) {
       await fetchData(1);
 
       if (fallidas.length) {
-        alert(`No se pudo subir:\n• ${fallidas.join('\n• ')}`);
+        await Alerts.error(
+          'Subida incompleta',
+          `No se pudo subir:\n• ${fallidas.join('\n• ')}`
+        );
+      } else {
+        Alerts.toastSuccess('Imágenes subidas');
       }
     } catch (err) {
       console.error(err);
@@ -198,27 +205,27 @@ export default function ChequeImagesManager({ chequeId }) {
     return 'otro';
   }
 
-async function openViewer(img) {
-  setViewer({ open: true, img });
-  console.log('[openViewer] chequeId:', chequeId, 'img.id:', img?.id);
+  async function openViewer(img) {
+    setViewer({ open: true, img });
+    console.log('[openViewer] chequeId:', chequeId, 'img.id:', img?.id);
 
-  try {
-    const [ths, evs] = await Promise.all([
-      listChequeImagenThumbs(chequeId, img.id),
-      listChequeImagenEventos(chequeId, { imagen_id: img.id })
-    ]);
+    try {
+      const [ths, evs] = await Promise.all([
+        listChequeImagenThumbs(chequeId, img.id),
+        listChequeImagenEventos(chequeId, { imagen_id: img.id })
+      ]);
 
-    // console.log('[openViewer] thumbs resp:', ths);
-    // console.log('[openViewer] eventos resp normalizado:', evs);
+      // console.log('[openViewer] thumbs resp:', ths);
+      // console.log('[openViewer] eventos resp normalizado:', evs);
 
-    setThumbs(ths?.items || []);
-    setEventos(evs?.items || []); // <- ahora siempre es array
-  } catch (err) {
-    console.error('[openViewer] error:', err);
-    setThumbs([]);
-    setEventos([]);
+      setThumbs(ths?.items || []);
+      setEventos(evs?.items || []); // <- ahora siempre es array
+    } catch (err) {
+      console.error('[openViewer] error:', err);
+      setThumbs([]);
+      setEventos([]);
+    }
   }
-}
 
   function closeViewer() {
     setViewer({ open: false, img: null });
@@ -231,28 +238,70 @@ async function openViewer(img) {
       await downloadChequeImagen(chequeId, img.id);
     } catch (e) {
       console.error(e);
-      alert('No se pudo descargar');
+      await Alerts.error(
+        'Descarga',
+        getErrorMessage(e, 'No se pudo descargar.')
+      );
     }
   }
   async function handleDelete(img) {
-    if (!confirm('¿Eliminar imagen?')) return;
+    const ok = await Alerts.confirm({
+      title: '¿Eliminar imagen?',
+      text: 'Esta acción no se puede deshacer.',
+      confirmText: 'Sí, eliminar',
+      danger: true
+    });
+    if (!ok) return;
+
     try {
+      Alerts.loading('Eliminando...');
       await deleteChequeImagen(chequeId, img.id);
+      Alerts.close();
+      Alerts.toastSuccess('Imagen eliminada');
       fetchData(page);
     } catch (e) {
+      Alerts.close();
       console.error(e);
-      alert('No se pudo eliminar');
+      await Alerts.error(
+        'No se pudo eliminar',
+        getErrorMessage(e, 'Error al eliminar la imagen.')
+      );
     }
   }
+
   async function handleEdit(img) {
-    const nuevo = prompt('Observaciones / nombre:', img.observaciones || '');
-    if (nuevo == null) return;
+    const res = await Swal.fire({
+      title: 'Editar observaciones',
+      input: 'text',
+      inputValue: img.observaciones || '',
+      inputPlaceholder: 'Observaciones / nombre...',
+      showCancelButton: true,
+      confirmButtonText: 'Guardar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#059669',
+      cancelButtonColor: '#64748b',
+      reverseButtons: true
+    });
+
+    if (!res.isConfirmed) return;
+
+    const nuevo = String(res.value || '').trim();
+
     try {
-      await updateChequeImagen(chequeId, img.id, { observaciones: nuevo });
+      Alerts.loading('Actualizando...');
+      await updateChequeImagen(chequeId, img.id, {
+        observaciones: nuevo || null
+      });
+      Alerts.close();
+      Alerts.toastSuccess('Actualizado');
       fetchData(page);
     } catch (e) {
+      Alerts.close();
       console.error(e);
-      alert('No se pudo actualizar');
+      await Alerts.error(
+        'No se pudo actualizar',
+        getErrorMessage(e, 'Error al actualizar la imagen.')
+      );
     }
   }
 

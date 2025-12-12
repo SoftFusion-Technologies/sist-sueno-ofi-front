@@ -22,6 +22,7 @@ import {
   fmtChequera,
   getChequeraSearchText
 } from '../../utils/chequerasFormat';
+import { Alerts, getErrorMessage } from '../../utils/alerts';
 
 import {
   X,
@@ -254,20 +255,35 @@ export default function ChequeFormModal({ open, onClose, onSubmit, initial }) {
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!form.numero || Number(form.numero) <= 0)
-      return alert('Número de cheque inválido');
-    if (!form.monto || Number(form.monto) <= 0) return alert('Monto inválido');
+
+    if (!form.numero || Number(form.numero) <= 0) {
+      await Alerts.error('Validación', 'Número de cheque inválido.');
+      return;
+    }
+    if (!form.monto || Number(form.monto) <= 0) {
+      await Alerts.error('Validación', 'Monto inválido.');
+      return;
+    }
 
     if (form.tipo === 'emitido') {
       if (form.formato === 'fisico') {
-        if (!form.chequera_id) return alert('Seleccione chequera');
+        if (!form.chequera_id) {
+          await Alerts.error('Validación', 'Seleccione chequera.');
+          return;
+        }
       } else {
         // eCheq emitido
-        if (!form.banco_id) return alert('Seleccione banco (emisión eCheq)');
+        if (!form.banco_id) {
+          await Alerts.error('Validación', 'Seleccione banco (emisión eCheq).');
+          return;
+        }
       }
     } else {
       // recibido
-      if (!form.banco_id) return alert('Seleccione banco');
+      if (!form.banco_id) {
+        await Alerts.error('Validación', 'Seleccione banco.');
+        return;
+      }
     }
 
     const payload = {
@@ -292,8 +308,20 @@ export default function ChequeFormModal({ open, onClose, onSubmit, initial }) {
 
     try {
       setSaving(true);
+      Alerts.loading('Guardando cheque...');
+
       await onSubmit(payload);
+
+      Alerts.close();
+      Alerts.toastSuccess('Cheque guardado');
+
       onClose();
+    } catch (err) {
+      Alerts.close();
+      await Alerts.error(
+        'No se pudo guardar',
+        getErrorMessage(err, 'Error al guardar el cheque')
+      );
     } finally {
       setSaving(false);
     }

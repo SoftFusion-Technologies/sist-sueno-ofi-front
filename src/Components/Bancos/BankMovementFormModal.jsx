@@ -19,6 +19,7 @@ import {
   Hash,
   Link2
 } from 'lucide-react';
+import { Alerts, getErrorMessage } from '../../utils/alerts';
 
 const TIPOS_REF = [
   'cheque',
@@ -122,9 +123,17 @@ export default function BankMovementFormModal({
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!form.banco_cuenta_id) return alert('Seleccione una cuenta');
+
+    if (!form.banco_cuenta_id) {
+      await Alerts.error('Validación', 'Seleccione una cuenta.');
+      return;
+    }
+
     const monto = Number(form.monto);
-    if (!(monto > 0)) return alert('Monto debe ser > 0');
+    if (!(monto > 0)) {
+      await Alerts.error('Validación', 'Monto debe ser mayor a 0.');
+      return;
+    }
 
     const payload = {
       banco_cuenta_id: Number(form.banco_cuenta_id),
@@ -138,8 +147,24 @@ export default function BankMovementFormModal({
 
     try {
       setSaving(true);
+      Alerts.loading(
+        isEdit ? 'Actualizando movimiento...' : 'Registrando movimiento...'
+      );
+
       await onSubmit(payload);
+
+      Alerts.close();
+      Alerts.toastSuccess(
+        isEdit ? 'Movimiento actualizado' : 'Movimiento registrado'
+      );
+
       onClose();
+    } catch (err) {
+      Alerts.close();
+      await Alerts.error(
+        'No se pudo guardar',
+        getErrorMessage(err, 'Error al guardar el movimiento bancario')
+      );
     } finally {
       setSaving(false);
     }

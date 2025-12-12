@@ -17,6 +17,7 @@ import {
   MapPinHouse
 } from 'lucide-react';
 import { listLocales } from '../../api/locales';
+import { Alerts, getErrorMessage } from '../../utils/alerts';
 
 const TIPOS_PV = [
   { value: 'WS_ARCA', label: 'WS ARCA (API)' },
@@ -104,32 +105,56 @@ export default function PuntoVentaFormModal({
       [name]: type === 'checkbox' ? checked : value
     }));
   };
-
   const submit = async (e) => {
     e.preventDefault();
 
     if (!String(form.empresa_id).trim() || !String(form.numero).trim()) {
-      alert('Empresa y número de punto de venta son obligatorios');
+      await Alerts.error(
+        'Validación',
+        'Empresa y número de punto de venta son obligatorios.'
+      );
       return;
     }
     if (!form.tipo) {
-      alert('Debés seleccionar un tipo de punto de venta');
+      await Alerts.error(
+        'Validación',
+        'Debés seleccionar un tipo de punto de venta.'
+      );
       return;
     }
     if (!form.modo) {
-      alert('Debés seleccionar un modo (HOMO / PROD)');
+      await Alerts.error(
+        'Validación',
+        'Debés seleccionar un modo (HOMO / PROD).'
+      );
       return;
     }
 
     try {
       setSaving(true);
+      Alerts.loading(
+        isEdit ? 'Actualizando punto de venta...' : 'Creando punto de venta...'
+      );
+
       await onSubmit({
         ...form,
         empresa_id: form.empresa_id ? Number(form.empresa_id) : null,
         numero: form.numero ? Number(form.numero) : null,
         local_id: form.local_id ? Number(form.local_id) : null
       });
+
+      Alerts.close();
+      Alerts.toastSuccess(
+        isEdit ? 'Punto de venta actualizado' : 'Punto de venta creado'
+      );
+
       onClose();
+    } catch (err) {
+      Alerts.close();
+      await Alerts.error(
+        'No se pudo guardar',
+        getErrorMessage(err, 'Error al guardar el punto de venta')
+      );
     } finally {
       setSaving(false);
     }

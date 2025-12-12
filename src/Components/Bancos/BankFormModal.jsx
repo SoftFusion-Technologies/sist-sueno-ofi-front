@@ -8,6 +8,7 @@ import {
   fieldV
 } from '../../ui/animHelpers';
 import { X, Landmark, Hash, BadgeCheck } from 'lucide-react';
+import { Alerts, getErrorMessage } from '../../utils/alerts';
 
 export default function BankFormModal({ open, onClose, onSubmit, initial }) {
   const [form, setForm] = useState({
@@ -39,15 +40,28 @@ export default function BankFormModal({ open, onClose, onSubmit, initial }) {
 
   const submit = async (e) => {
     e.preventDefault();
+
     if (!form.nombre.trim()) {
-      // podés reemplazar por tu SweetAlert si querés
-      alert('El nombre es obligatorio');
+      await Alerts.error('Validación', 'El nombre es obligatorio.');
       return;
     }
+
     try {
       setSaving(true);
+      Alerts.loading(isEdit ? 'Actualizando banco...' : 'Creando banco...');
+
       await onSubmit(form);
+
+      Alerts.close();
+      Alerts.toastSuccess(isEdit ? 'Banco actualizado' : 'Banco creado');
+
       onClose();
+    } catch (err) {
+      Alerts.close();
+      await Alerts.error(
+        'No se pudo guardar',
+        getErrorMessage(err, 'Error al guardar el banco')
+      );
     } finally {
       setSaving(false);
     }

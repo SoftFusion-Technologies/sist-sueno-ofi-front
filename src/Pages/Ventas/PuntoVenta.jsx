@@ -27,6 +27,55 @@ import TicketVentaModal from './Config/TicketVentaModal';
 import TotalConOpciones from './Components/TotalConOpciones';
 import ModalOtrosLocales from './Components/ModalOtrosLocales';
 import { useDebouncedValue } from '../../utils/useDebouncedValue';
+import Swal from 'sweetalert2';
+
+const toast = Swal.mixin({
+  toast: true,
+  position: 'top-end',
+  showConfirmButton: false,
+  timer: 2200,
+  timerProgressBar: true
+});
+
+const swalError = (title, text) =>
+  Swal.fire({
+    icon: 'error',
+    title,
+    text,
+    confirmButtonText: 'Entendido',
+    confirmButtonColor: '#059669'
+  });
+
+const swalSuccess = (title, text) =>
+  Swal.fire({
+    icon: 'success',
+    title,
+    text,
+    confirmButtonText: 'OK',
+    confirmButtonColor: '#059669'
+  });
+
+const swalConfirm = ({ title, text }) =>
+  Swal.fire({
+    icon: 'warning',
+    title,
+    text,
+    showCancelButton: true,
+    confirmButtonText: 'Sí, confirmar',
+    cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#dc2626',
+    cancelButtonColor: '#64748b',
+    reverseButtons: true
+  });
+
+const swalLoading = (title = 'Procesando...') =>
+  Swal.fire({
+    title,
+    allowOutsideClick: false,
+    allowEscapeKey: false,
+    didOpen: () => Swal.showLoading()
+  });
+
 
 const toNum = (v, d = 0) => {
   const n = Number(v);
@@ -360,7 +409,7 @@ export default function PuntoVenta() {
       );
 
       if (res.status === 401) {
-        alert('Tu sesión expiró. Iniciá sesión nuevamente.');
+        await swalSessionExpired();
         setProductosModal([]);
         return;
       }
@@ -377,6 +426,10 @@ export default function PuntoVenta() {
     } catch (error) {
       console.error('Error al cargar productos para el modal:', error);
       setProductosModal([]);
+      await swalError(
+        'Error',
+        'No se pudieron cargar los productos para el modal.'
+      );
     }
   };
 
@@ -412,9 +465,10 @@ export default function PuntoVenta() {
         }
       );
       if (res.status === 401) {
-        alert('Tu sesión expiró. Iniciá sesión nuevamente.');
+        await swalSessionExpired();
         return;
       }
+
       if (!res.ok) throw new Error(`Error ${res.status} al cargar combo`);
 
       const permitidos = await res.json();
@@ -422,7 +476,10 @@ export default function PuntoVenta() {
       // Solo los que tienen producto asociado
       const productosDirectos = permitidos.filter((p) => p.producto);
       if (!productosDirectos.length) {
-        alert('Este combo no tiene productos configurados.');
+        await swalWarn(
+          'Combo sin ítems',
+          'Este combo no tiene productos configurados.'
+        );
         return;
       }
 
@@ -497,7 +554,8 @@ export default function PuntoVenta() {
       const items = (await Promise.all(consultas)).filter(Boolean);
 
       if (!items.length) {
-        alert(
+        await swalWarn(
+          'Sin stock en tu sucursal',
           'No hay stock disponible en tu sucursal para los productos del combo.'
         );
         return;
@@ -512,7 +570,10 @@ export default function PuntoVenta() {
       }
 
       if (!usados.length) {
-        alert('Los productos del combo no tienen stock disponible.');
+        await swalWarn(
+          'Sin stock',
+          'Los productos del combo no tienen stock disponible.'
+        );
         return;
       }
 
@@ -529,7 +590,7 @@ export default function PuntoVenta() {
       setModalVerCombosOpen(false);
     } catch (error) {
       console.error('Error al seleccionar combo:', error);
-      alert('Ocurrió un error al seleccionar el combo.');
+      await swalError('Error', 'Ocurrió un error al seleccionar el combo.');
     }
   };
 
@@ -592,7 +653,7 @@ export default function PuntoVenta() {
   const [totalCalculado, setTotalCalculado] = useState(null);
 
   // useEffect(() => {
-  //   if (!totalCalculado) return; // 🟢 Esto lo previene
+  //   if (!totalCalculado) return; //  Esto lo previene
 
   //   let total = totalCalculado.precio_base;
   //   let ajuste = 0;
@@ -677,16 +738,22 @@ export default function PuntoVenta() {
 
   const finalizarVenta = async () => {
     if (carrito.length === 0) {
-      alert('Agregá productos al carrito.');
+      await swalWarn('Carrito vacío', 'Agregá productos al carrito.');
       return;
     }
     if (!medioPago) {
-      alert('Seleccioná un medio de pago.');
+      await swalWarn('Medio de pago', 'Seleccioná un medio de pago.');
       return;
     }
-    if (!window.confirm('¿Deseás registrar la venta?')) return;
 
-    // 🟢 carrito está en modo "stock": cada item tiene stock_id, precio, precio_con_descuento, etc.
+    const confirm = await swalConfirm({
+      title: '¿Registrar la venta?',
+      text: 'Se confirmará la operación y se generará el comprobante.',
+      confirmText: 'Sí, registrar'
+    });
+    if (!confirm.isConfirmed) return;
+
+    //  carrito está en modo "stock": cada item tiene stock_id, precio, precio_con_descuento, etc.
     const productosRequest = carrito.map((item) => {
       const precioOriginal = Number(item.precio ?? 0); // ya no dependas de item.producto?.precio
       const precioFinal = Number(item.precio_con_descuento ?? item.precio ?? 0);
@@ -802,7 +869,7 @@ export default function PuntoVenta() {
           setMensajeCaja(msg);
           setMostrarModalCaja(true);
         } else {
-          alert(msg);
+          await swalError('No se pudo registrar la venta', msg);
         }
         return;
       }
@@ -813,7 +880,7 @@ export default function PuntoVenta() {
       setDescuentoPersonalizado('');
       setAplicarDescuento(false);
 
-      // 🔁 refrescar resultados de búsqueda SIN agrupar
+      //  refrescar resultados de búsqueda SIN agrupar
       if (busqueda.trim() !== '') {
         const res2 = await fetch(
           `http://localhost:8080/buscar-productos-detallado?query=${encodeURIComponent(
@@ -821,8 +888,6 @@ export default function PuntoVenta() {
           )}`
         );
         const data2 = await res2.json().catch(() => []);
-        // ⛔️ ya no uses agruparProductosConTalles
-        // setProductos(Array.isArray(data2) ? data2 : []);
       }
 
       const data = await response.json();
@@ -832,13 +897,19 @@ export default function PuntoVenta() {
         `http://localhost:8080/ventas/${ventaId}`
       ).then((r) => r.json());
       setVentaFinalizada(ventaCompleta);
-      alert('✅ Venta registrada correctamente');
+      await swalSuccess(
+        'Venta registrada',
+        'La venta se registró correctamente.'
+      );
 
       setCarrito([]);
       setClienteSeleccionado(null);
       setBusquedaCliente('');
     } catch (err) {
-      alert('Error de red al registrar la venta');
+      await swalError(
+        'Error de red',
+        'No se pudo registrar la venta. Intentá nuevamente.'
+      );
       console.error('Error:', err);
     }
   };
@@ -849,19 +920,26 @@ export default function PuntoVenta() {
       isNaN(parseFloat(saldoInicial)) ||
       parseFloat(saldoInicial) < 0
     ) {
-      alert('Ingresá un saldo inicial válido');
+      await swalWarn('Saldo inválido', 'Ingresá un saldo inicial válido.');
       return false;
     }
     try {
-      const res = await axios.post(`http://localhost:8080/caja`, {
+      swalLoading('Abriendo caja...');
+      await axios.post(`http://localhost:8080/caja`, {
         usuario_id: userId,
         local_id: userLocalId,
         saldo_inicial: parseFloat(saldoInicial)
       });
       setSaldoInicial('');
-      return true; // ✅ apertura exitosa
+      Swal.close();
+      toast.fire({ icon: 'success', title: 'Caja abierta correctamente' });
+      return true;
     } catch (err) {
-      alert(err.response?.data?.mensajeError || 'Error al abrir caja');
+      Swal.close();
+      await swalError(
+        'No se pudo abrir la caja',
+        err.response?.data?.mensajeError || 'Error al abrir caja'
+      );
       return false;
     }
   };
@@ -874,7 +952,7 @@ export default function PuntoVenta() {
 
     const params = new URLSearchParams({
       query: q,
-      local_id: String(userLocalId || '') // 👈 enviar local
+      local_id: String(userLocalId || '') //  enviar local
     });
 
     try {
@@ -885,7 +963,10 @@ export default function PuntoVenta() {
 
       const data = await res.json();
       if (!Array.isArray(data) || data.length === 0) {
-        alert('Producto no encontrado o sin stock en tu local');
+        await swalWarn(
+          'Sin stock',
+          'Producto no encontrado o sin stock en tu local.'
+        );
         return;
       }
 
@@ -907,7 +988,7 @@ export default function PuntoVenta() {
       agregarAlCarrito(item, usarDesc);
     } catch (err) {
       console.error('Error al buscar producto por código:', err);
-      alert(err.message || 'Error al buscar producto');
+      await swalError('Error', err.message || 'Error al buscar producto');
     }
   };
 
