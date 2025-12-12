@@ -255,8 +255,9 @@ function AppContent() {
               </ProtectedRoute>
             }
           />
+          {/* clientes ahora desde el dashboard, antes en ventas Benjamin Orellana */}
           <Ruta
-            path="/dashboard/ventas/clientes"
+            path="/dashboard/clientes"
             element={
               <ProtectedRoute>
                 {' '}

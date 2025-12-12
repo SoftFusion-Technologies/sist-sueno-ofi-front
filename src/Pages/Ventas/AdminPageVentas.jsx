@@ -19,18 +19,13 @@ import {
   FaCog,
   FaCashRegister,
   FaTruckMoving,
-  FaRegSmileBeam
+  FaRegSmileBeam,
+  FaTable
 } from 'react-icons/fa';
 import { LiaCashRegisterSolid } from 'react-icons/lia';
 
 // Todas las secciones clave del módulo de ventas
 const ventasLinks = [
-  {
-    to: '/dashboard/ventas/pos',
-    label: 'Punto de Venta',
-    icon: <FaCashRegister />, // Venta rápida / caja
-    desc: 'Registrar ventas en mostrador'
-  },
   {
     to: '/dashboard/ventas/caja',
     label: 'Caja',
@@ -41,25 +36,37 @@ const ventasLinks = [
     to: '/dashboard/ventas/cajas-abiertas',
     label: 'Cajas Abiertas',
     icon: <FaFileInvoiceDollar />,
-    desc: 'Resumen de Cajas'
-  },
-  {
-    to: '/dashboard/ventas/movimientos',
-    label: 'Movimientos',
-    icon: <LiaCashRegisterSolid />,
-    desc: 'Movimientos de caja'
+    desc: 'Resumen de Cajas abiertas por local'
   },
   {
     to: '/dashboard/ventas/resumen',
     label: 'Resumenes de Caja',
     icon: <FaRegSmileBeam />,
-    desc: 'Movimientos de caja'
+    desc: 'Movimientos de caja historico'
+  },
+  {
+    to: '/dashboard/ventas/pos',
+    label: 'Punto de Venta',
+    icon: <FaCashRegister />, // Venta rápida / caja
+    desc: 'Registrar ventas en mostrador'
   },
   {
     to: '/dashboard/ventas/historial',
     label: 'Historial de Ventas',
     icon: <FaHistory />,
     desc: 'Listado completo con filtros'
+  },
+  {
+    to: '/dashboard/ventas/historial',
+    label: 'Tabla de Ventas',
+    icon: <FaTable />,
+    desc: 'Listado completo de ventas filtros'
+  },
+  {
+    to: '/dashboard/ventas/movimientos',
+    label: 'Movimientos',
+    icon: <LiaCashRegisterSolid />,
+    desc: 'Movimientos de caja'
   },
   {
     to: '/dashboard/ventas/historico-movimientos',
@@ -79,12 +86,7 @@ const ventasLinks = [
     icon: <FaStar />,
     desc: 'Ranking de productos top'
   },
-  {
-    to: '/dashboard/ventas/clientes',
-    label: 'Clientes',
-    icon: <FaUserFriends />,
-    desc: 'Gestión y fidelización'
-  },
+
   {
     to: '/dashboard/ventas/devoluciones',
     label: 'Devoluciones',

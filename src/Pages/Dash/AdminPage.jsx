@@ -29,7 +29,8 @@ import {
   FaUniversity,
   FaMoneyCheckAlt,
   FaPiggyBank,
-  FaFileInvoiceDollar // <-- ARCA / Facturación
+  FaFileInvoiceDollar, // <-- ARCA / Facturación
+  FaUserFriends
 } from 'react-icons/fa';
 
 // --------- Tile genérico de módulo ----------
@@ -222,6 +223,13 @@ const AdminPage = () => {
                 description="Flujo de fondos, caja central y visión global de tesorería."
                 to="/dashboard/tesoreria"
                 icon={FaPiggyBank}
+                delay={0.28}
+              />
+              <DashboardTile
+                title="Clientes"
+                description="ABM de clientes, Fisicos y Jurídicos, ver ultimas compras."
+                to="/dashboard/clientes"
+                icon={FaUserFriends}
                 delay={0.28}
               />
             </div>
