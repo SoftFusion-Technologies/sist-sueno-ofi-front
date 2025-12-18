@@ -63,17 +63,29 @@ const links = [
     icon: <FaHandHoldingUsd />
   },
   {
+    to: '/dashboard/compras/movimientos-stock',
+    label: 'Movimientos de Stock',
+    sub: 'Ver stock movimientos de compras',
+    icon: <FaTruck />
+  },
+  {
     to: '/dashboard/compras/impuestos',
     label: 'Impuestos por Compra',
     sub: 'IVA/perc/ret',
     icon: <FaPercent />
   },
   {
-    to: '/dashboard/compras/ordenes',
-    label: 'Órdenes de Compra',
-    sub: 'Pre-aprobación',
-    icon: <FaClipboardList />
-  },
+    to: '/dashboard/compras/impuestos-config',
+    label: 'Config. Impuestos',
+    sub: 'Catálogo de alícuotas',
+    icon: <FaCogs />
+  }
+  // {
+  //   to: '/dashboard/compras/ordenes',
+  //   label: 'Órdenes de Compra',
+  //   sub: 'Pre-aprobación',
+  //   icon: <FaClipboardList />
+  // },
   // {
   //   to: '/dashboard/compras/recepciones',
   //   label: 'Recepciones',
@@ -86,12 +98,6 @@ const links = [
   //   sub: 'Stock + CxP',
   //   icon: <FaUndoAlt />
   // },
-  {
-    to: '/dashboard/compras/impuestos-config',
-    label: 'Config. Impuestos',
-    sub: 'Catálogo de alícuotas',
-    icon: <FaCogs />
-  },
   // {
   //   to: '/dashboard/compras/adjuntos',
   //   label: 'Adjuntos',

@@ -1109,7 +1109,6 @@ export default function CompraFormModal({ open, onClose, initial, fetchData }) {
                 </div>
 
                 {/* ===== Detalle de ítems ===== */}
-                {/* ===== Detalle de ítems ===== */}
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4 sm:p-5">
                   <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                     <div className="flex items-center gap-2 text-gray-200 font-medium">

@@ -96,6 +96,7 @@ import AdminPageArca from './Pages/ARCA/AdminPageArca';
 import EmpresasCards from './Pages/ARCA/EmpresasCards';
 import PuntosVentaCards from './Pages/ARCA/PuntosVentaCards';
 import ComprobantesFiscalesCards from './Pages/ARCA/ComprobantesFiscalesCards';
+import MovimientosStock from './Pages/Compras/MovimientosStock';
 
 function AppContent() {
   const { hideLayoutFooter, hideLayoutNav } = useLayoutVisibility();
@@ -601,11 +602,20 @@ function AppContent() {
             }
           />
           <Ruta
-            path="/dashboard/compras/impuestos"
+            path="/dashboard/compras/ordenes"
             element={
               <ProtectedRoute>
                 {' '}
-                <ComprasImpuestosPage />{' '}
+                <OrdenesCompraListado />{' '}
+              </ProtectedRoute>
+            }
+          />
+          <Ruta
+            path="/dashboard/compras/movimientos-stock"
+            element={
+              <ProtectedRoute>
+                {' '}
+                <MovimientosStock />{' '}
               </ProtectedRoute>
             }
           />
