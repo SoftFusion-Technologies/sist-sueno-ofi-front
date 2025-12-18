@@ -74,30 +74,30 @@ const links = [
     sub: 'Pre-aprobación',
     icon: <FaClipboardList />
   },
-  {
-    to: '/dashboard/compras/recepciones',
-    label: 'Recepciones',
-    sub: 'Remitos / ingreso',
-    icon: <FaTruck />
-  },
-  {
-    to: '/dashboard/compras/devoluciones',
-    label: 'Devoluciones a Proveedor',
-    sub: 'Stock + CxP',
-    icon: <FaUndoAlt />
-  },
+  // {
+  //   to: '/dashboard/compras/recepciones',
+  //   label: 'Recepciones',
+  //   sub: 'Remitos / ingreso',
+  //   icon: <FaTruck />
+  // },
+  // {
+  //   to: '/dashboard/compras/devoluciones',
+  //   label: 'Devoluciones a Proveedor',
+  //   sub: 'Stock + CxP',
+  //   icon: <FaUndoAlt />
+  // },
   {
     to: '/dashboard/compras/impuestos-config',
     label: 'Config. Impuestos',
     sub: 'Catálogo de alícuotas',
     icon: <FaCogs />
   },
-  {
-    to: '/dashboard/compras/adjuntos',
-    label: 'Adjuntos',
-    sub: 'PDF/Remitos/Comprob.',
-    icon: <FaCloudUploadAlt />
-  }
+  // {
+  //   to: '/dashboard/compras/adjuntos',
+  //   label: 'Adjuntos',
+  //   sub: 'PDF/Remitos/Comprob.',
+  //   icon: <FaCloudUploadAlt />
+  // }
 ];
 
 // Mini hook de tilt 3D con framer-motion (efecto sutil, "poco visto")
