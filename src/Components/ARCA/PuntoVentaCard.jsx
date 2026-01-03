@@ -158,8 +158,8 @@ export default function PuntoVentaCard({
           >
             <Field label="Tipo">{tipoLabel[item?.tipo] || item?.tipo}</Field>
             <Field label="Modo">{modoLabel[item?.modo] || item?.modo}</Field>
-            <Field label="Local (ID)">
-              {item?.local_id ? `Local ID ${item.local_id}` : ''}
+            <Field label="Número (PV)">
+              {item?.numero ? `Número: ${item.numero}` : ''}
             </Field>
             <Field label="Descripción">{item?.descripcion}</Field>
           </div>

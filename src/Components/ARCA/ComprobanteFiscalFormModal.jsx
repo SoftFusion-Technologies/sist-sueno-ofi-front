@@ -25,13 +25,13 @@ const TIPO_OPCIONES = [
   { value: '', label: 'Seleccionar tipo…' },
   { value: '1', label: '01 - Factura A' },
   { value: '6', label: '06 - Factura B' },
-  { value: '11', label: '11 - Factura C' },
+  // { value: '11', label: '11 - Factura C' },
   { value: '3', label: '03 - Nota de crédito A' },
   { value: '8', label: '08 - Nota de crédito B' },
-  { value: '13', label: '13 - Nota de crédito C' },
+  // { value: '13', label: '13 - Nota de crédito C' },
   { value: '2', label: '02 - Nota de débito A' },
   { value: '7', label: '07 - Nota de débito B' },
-  { value: '12', label: '12 - Nota de débito C' }
+  // { value: '12', label: '12 - Nota de débito C' }
 ];
 
 const toDateInput = (val) => {
@@ -343,7 +343,7 @@ export default function ComprobanteFiscalFormModal({
                       className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-white
                                  placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-300/40 focus:border-transparent"
                     >
-                      <option value="">Seleccionar PV…</option>
+                      <option n="">Seleccionar PV…</option>
                       {puntosFiltrados.map((pv) => (
                         <option
                           className="text-black"
